@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Verified Certificate | EduVault{% endblock %}
+{% block public_content %}
+<section class="detail-section">
+  <div class="container">
+    <div class="detail-card">
+      <div class="cert-preview large"><i class="bi bi-award"></i></div>
+      <div>
+        <p class="eyebrow">SHA-256 Verified Certificate</p>
+        <h1>{{ cert.course_title }}</h1>
+        <p class="lead">Issued by {{ cert.issuer }} for {{ owner.full_name }}.</p>
+        <dl class="detail-list">
+          <div><dt>Uploaded</dt><dd>{{ cert.uploaded_at[:10] }}</dd></div>
+          <div><dt>File</dt><dd>{{ cert.original_filename }}</dd></div>
+          <div><dt>SHA-256</dt><dd class="hash-text">{{ cert.sha256 }}</dd></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

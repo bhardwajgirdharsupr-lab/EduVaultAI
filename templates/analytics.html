@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Analytics | EduVault{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">Progress intelligence</p>
+    <h1>Analytics</h1>
+  </div>
+  <a class="btn btn-outline-dark" href="{{ url_for('export_json') }}">Download JSON Export</a>
+</div>
+
+<div class="stats-grid mb-4">
+  <div class="stat-card"><i class="bi bi-collection"></i><span>Total Records</span><strong>{{ stats.total_courses }}</strong></div>
+  <div class="stat-card"><i class="bi bi-check-circle"></i><span>Verified</span><strong>{{ stats.verified_certificates }}</strong></div>
+  <div class="stat-card"><i class="bi bi-speedometer2"></i><span>Average Progress</span><strong>{{ stats.average_progress }}%</strong></div>
+  <div class="stat-card"><i class="bi bi-share"></i><span>Portfolio Items</span><strong>{{ stats.portfolio_items }}</strong></div>
+</div>
+
+<div class="analytics-grid">
+  <div class="panel">
+    <h2>Learning Progress</h2>
+    {% for item in items %}
+      <div class="progress-row">
+        <div class="d-flex justify-content-between"><strong>{{ item.title }}</strong><span>{{ item.progress }}%</span></div>
+        <div class="progress"><div class="progress-bar" style="width: {{ item.progress }}%"></div></div>
+      </div>
+    {% else %}
+      <div class="empty-panel">Progress charts appear once your vault has learning items.</div>
+    {% endfor %}
+  </div>
+  <div class="panel">
+    <h2>Sources</h2>
+    {% for source in source_counts %}
+      <div class="source-row"><span>{{ source.source }}</span><strong>{{ source.count }}</strong></div>
+    {% else %}
+      <div class="empty-panel">Import courses to see source analytics.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

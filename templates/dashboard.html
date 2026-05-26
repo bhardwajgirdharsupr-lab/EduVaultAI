@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | EduVault{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">My vault</p>
+    <h1>My Learning Vault Dashboard</h1>
+  </div>
+  <form method="post" action="{{ url_for('share_portfolio') }}">
+    {{ csrf_field() }}
+    <button class="btn btn-blue" type="submit">Generate Portfolio Link</button>
+  </form>
+</div>
+
+<div class="dashboard-grid">
+  <section class="main-column">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <i class="bi bi-shield-check"></i>
+        <span>Total Courses</span>
+        <strong>{{ stats.total_courses }}</strong>
+      </div>
+      <div class="stat-card">
+        <i class="bi bi-patch-check-fill text-success"></i>
+        <span>Verified Certificates</span>
+        <strong>{{ stats.verified_certificates }}</strong>
+      </div>
+      <div class="stat-card">
+        <i class="bi bi-clock-history"></i>
+        <span>Hours Learned</span>
+        <strong>{{ stats.hours_learned }}</strong>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Quick Add</h2>
+      <form class="inline-action" method="post" action="{{ url_for('import_url') }}">
+        {{ csrf_field() }}
+        <input type="url" name="url" placeholder="Paste YouTube/Course URL" required>
+        <button class="btn btn-blue" type="submit">Import Button</button>
+      </form>
+    </div>
+
+    <div class="section-head">
+      <h2>My Certificate Vault</h2>
+      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('certificates') }}">View All</a>
+    </div>
+    <div class="certificate-grid compact">
+      {% for cert in certificates[:4] %}
+        <article class="certificate-card">
+          <div class="cert-preview"><i class="bi bi-award"></i></div>
+          <div>
+            <p class="cert-issuer">{{ cert.issuer }}</p>
+            <h3>{{ cert.course_title }}</h3>
+            <p class="muted-small">Issued {{ cert.uploaded_at[:10] }}</p>
+          </div>
+          <div class="verified-strip"><i class="bi bi-check-circle-fill"></i> SHA-256 Verified</div>
+        </article>
+      {% else %}
+        <div class="empty-panel">Upload certificates to see verified cards here.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <aside class="side-column">
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">My Learning Timeline</h2>
+        <a href="{{ url_for('resources') }}" class="btn btn-blue btn-sm">Verify Now</a>
+      </div>
+      <div class="timeline-list">
+        {% for item in items[:5] %}
+          <div class="timeline-item">
+            <div class="timeline-icon"><i class="bi bi-journal-text"></i></div>
+            <div class="flex-grow-1">
+              <strong>{{ item.title }}</strong>
+              <p>{{ item.platform or item.source }} &middot; {{ item.status }}</p>
+              {% if item.progress < 100 %}
+                <div class="progress progress-slim"><div class="progress-bar" style="width: {{ item.progress }}%"></div></div>
+              {% endif %}
+            </div>
+            {% if item.status == 'verified' %}
+              <span class="badge text-bg-success">Verified</span>
+            {% else %}
+              <span class="small fw-bold">{{ item.progress }}%</span>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="empty-panel">Your learning timeline will appear after imports.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Learning Progress</h2>
+      <div class="chart-bars">
+        {% for item in items[:7] %}
+          <span style="height: {{ 25 + item.progress * 0.65 }}%" title="{{ item.title }}"></span>
+        {% else %}
+          <span style="height: 25%"></span><span style="height: 40%"></span><span style="height: 55%"></span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel portfolio-card">
+      <h2>My Professional Portfolio (Public View)</h2>
+      <div class="d-flex gap-3 align-items-center">
+        <div class="avatar large">{{ current_user.full_name[:1] }}</div>
+        <div>
+          <strong>{{ current_user.full_name }}</strong>
+          <p class="mb-1">Skills: {{ items[0].skills if items and items[0].skills else 'Courses, certificates, and verified records.' }}</p>
+          {% if portfolio_link %}
+            <a href="{{ url_for('public_portfolio', token=portfolio_link.token) }}" target="_blank">Open public portfolio</a>
+          {% else %}
+            <span class="muted-small">Generate a link to share your portfolio.</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

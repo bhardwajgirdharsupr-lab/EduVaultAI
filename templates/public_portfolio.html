@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ owner.full_name }} Portfolio | EduVault{% endblock %}
+{% block public_content %}
+<section class="detail-section">
+  <div class="container">
+    <div class="public-profile">
+      <div class="avatar xlarge">{{ owner.full_name[:1] }}</div>
+      <div>
+        <p class="eyebrow">Verified EduVault Portfolio</p>
+        <h1>{{ owner.full_name }}</h1>
+        <p class="lead">{{ owner.institution or 'Learning portfolio' }}</p>
+      </div>
+    </div>
+    <div class="certificate-grid mt-4">
+      {% for cert in certificates %}
+        <article class="certificate-card">
+          <div class="cert-preview"><i class="bi bi-award"></i></div>
+          <div>
+            <p class="cert-issuer">{{ cert.issuer }}</p>
+            <h3>{{ cert.course_title }}</h3>
+            <p class="muted-small">SHA-256: {{ cert.sha256[:24] }}...</p>
+          </div>
+          <div class="verified-strip"><i class="bi bi-check-circle-fill"></i> Verified</div>
+        </article>
+      {% else %}
+        <div class="empty-panel">No public certificates have been added yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

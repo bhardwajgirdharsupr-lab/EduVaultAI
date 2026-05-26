@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}EduVault | Educational Portfolio and Verification Vault{% endblock %}
+{% block public_content %}
+<section class="hero-section">
+  <div class="container">
+    <div class="hero-copy mx-auto text-center">
+      <p class="eyebrow">Learning proof, organized</p>
+      <h1>Your All-in-One Educational Portfolio and Verification Vault.</h1>
+      <p class="lead">Securely import, manage, verify, and share learning certificates and achievements from one polished dashboard.</p>
+      <form class="hero-search" action="{{ url_for('start_import') }}" method="post">
+        {{ csrf_field() }}
+        <i class="bi bi-search"></i>
+        <input type="text" name="url" placeholder="Paste course URL, certificate hash, or search certificates...">
+        <button class="btn btn-blue" type="submit">Verify & Import</button>
+      </form>
+    </div>
+    <div class="feature-row">
+      <div class="feature-pill">
+        <i class="bi bi-check2-circle"></i>
+        <span>Instant SHA-256 Verification</span>
+      </div>
+      <div class="feature-pill">
+        <i class="bi bi-bar-chart"></i>
+        <span>Learning Progress Tracking</span>
+      </div>
+      <div class="feature-pill">
+        <i class="bi bi-person-vcard"></i>
+        <span>Shareable Professional Portfolio</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

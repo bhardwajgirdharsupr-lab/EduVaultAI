@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Settings | EduVault{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">Account control</p>
+    <h1>My Account Settings</h1>
+  </div>
+  <a class="btn btn-blue" href="{{ url_for('export_json') }}">View Account Details</a>
+</div>
+
+<div class="settings-grid">
+  <section class="panel">
+    <h2>Profile Information</h2>
+    <form method="post" class="profile-grid">
+      {{ csrf_field() }}
+      <input type="hidden" name="action" value="profile">
+      <div class="profile-avatar">
+        <div class="avatar xlarge">{{ current_user.full_name[:1] }}</div>
+        <button class="btn btn-blue btn-sm" type="button" disabled>Edit Avatar</button>
+      </div>
+      <div class="form-fields">
+        <label>Full Name</label>
+        <input class="form-control" type="text" name="full_name" value="{{ current_user.full_name }}">
+        <label>Email Address</label>
+        <input class="form-control" type="email" value="{{ current_user.email }}" disabled>
+        <label>Phone</label>
+        <input class="form-control" type="text" name="phone" value="{{ current_user.phone or '' }}">
+        <label>Educational Institution</label>
+        <input class="form-control" type="text" name="institution" value="{{ current_user.institution or '' }}">
+        <label>Location</label>
+        <input class="form-control" type="text" name="location" value="{{ current_user.location or '' }}">
+        <label>Language</label>
+        <select class="form-select" name="language">
+          <option {% if current_user.language == 'English' %}selected{% endif %}>English</option>
+          <option {% if current_user.language == 'Hindi' %}selected{% endif %}>Hindi</option>
+          <option {% if current_user.language == 'Spanish' %}selected{% endif %}>Spanish</option>
+        </select>
+        <button class="btn btn-blue" type="submit">Save Changes</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Vault Preferences</h2>
+    <form method="post" class="stacked-form">
+      {{ csrf_field() }}
+      <input type="hidden" name="action" value="preferences">
+      <label>Preferred Aggregator Service</label>
+      <select class="form-select" name="preferred_aggregator">
+        <option {% if current_user.preferred_aggregator == 'EduVault Aggregator' %}selected{% endif %}>EduVault Aggregator</option>
+        <option {% if current_user.preferred_aggregator == 'YouTube' %}selected{% endif %}>YouTube</option>
+        <option {% if current_user.preferred_aggregator == 'Coursera' %}selected{% endif %}>Coursera</option>
+      </select>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" name="auto_import_youtube" id="autoImport" {% if current_user.auto_import_youtube %}checked{% endif %}>
+        <label class="form-check-label" for="autoImport">Auto-Import from YouTube</label>
+      </div>
+      <label>Default Resource Note Format</label>
+      <input class="form-control" type="text" name="default_note_format" value="{{ current_user.default_note_format }}">
+      <button class="btn btn-blue" type="submit">Save Preferences</button>
+    </form>
+  </section>
+
+  <section class="panel integrations-panel">
+    <h2>Third-Party Integrations</h2>
+    <div class="integration-grid">
+      <div><i class="bi bi-google"></i><strong>Google OAuth</strong><span>{{ 'Connected' if current_user.oauth_provider == 'google' else 'Available' }}</span></div>
+      <div><i class="bi bi-linkedin"></i><strong>LinkedIn</strong><span>Coming Soon</span></div>
+      <div><i class="bi bi-infinity"></i><strong>Coursera</strong><span>Coming Soon</span></div>
+    </div>
+  </section>
+
+  <section class="panel account-actions">
+    <h2>Account Actions</h2>
+    <form method="post" class="stacked-form">
+      {{ csrf_field() }}
+      <input type="hidden" name="action" value="password">
+      <input class="form-control" type="password" name="current_password" placeholder="Current password">
+      <input class="form-control" type="password" name="new_password" placeholder="New password">
+      <button class="btn btn-dark" type="submit">Change Password</button>
+    </form>
+    <form method="post" class="mt-3">
+      {{ csrf_field() }}
+      <input type="hidden" name="action" value="deactivate">
+      <button class="btn btn-danger w-100" type="submit">Deactivate Account</button>
+    </form>
+  </section>
+
+  <section class="panel billing-panel">
+    <h2>Billing & Subscription</h2>
+    <p><strong>Current Plan:</strong> Free</p>
+    <p><strong>Renewal Date:</strong> Not applicable</p>
+    <p><strong>Payment Method:</strong> Payment provider coming soon</p>
+    <button class="btn btn-blue" type="button" disabled>Upgrade to Pro</button>
+    <button class="btn btn-outline-dark" type="button" disabled>Update Payment Method</button>
+  </section>
+</div>
+{% endblock %}

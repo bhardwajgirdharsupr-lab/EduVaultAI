@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Sign In | EduVault{% endblock %}
+{% block public_content %}
+<section class="auth-section">
+  <div class="auth-card">
+    <h1>Sign In to Your EduVault</h1>
+    <form method="post" class="stacked-form">
+      {{ csrf_field() }}
+      <label>Email</label>
+      <div class="input-icon">
+        <i class="bi bi-envelope"></i>
+        <input type="email" name="email" placeholder="Enter your email..." required>
+      </div>
+      <div class="d-flex justify-content-between align-items-center">
+        <label>Password</label>
+        <a class="small-link" href="{{ url_for('static_page', page='help') }}">Forgot password?</a>
+      </div>
+      <div class="input-icon">
+        <i class="bi bi-lock"></i>
+        <input type="password" name="password" placeholder="Enter your password..." required>
+      </div>
+      <button class="btn btn-blue w-100" type="submit">Sign In</button>
+    </form>
+    <div class="divider"><span>or sign in with</span></div>
+    <div class="oauth-row">
+      {% if oauth_enabled %}
+        <a class="oauth-button" href="{{ url_for('google_login') }}" title="Sign in with Google"><i class="bi bi-google"></i></a>
+      {% else %}
+        <button class="oauth-button" type="button" disabled title="Google OAuth needs credentials"><i class="bi bi-google"></i></button>
+      {% endif %}
+      <button class="oauth-button" type="button" disabled title="LinkedIn integration coming soon"><i class="bi bi-linkedin"></i></button>
+      <button class="oauth-button" type="button" disabled title="GitHub integration coming soon"><i class="bi bi-github"></i></button>
+    </div>
+    <p class="text-center mb-0 mt-4">Don't have an account? <a href="{{ url_for('register') }}">Create Account</a></p>
+  </div>
+</section>
+{% endblock %}

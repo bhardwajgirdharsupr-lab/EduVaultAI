@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ course.title }} | EduVault{% endblock %}
+{% block public_content %}
+<section class="detail-section">
+  <div class="container">
+    <div class="detail-card">
+      <div class="course-logo large">
+        <span>{{ course.badge }}</span>
+        <strong>{{ course.platform }}</strong>
+      </div>
+      <div>
+        <p class="eyebrow">{{ course.platform }}</p>
+        <h1>{{ course.title }}</h1>
+        <p class="lead">{{ course.description }}</p>
+        <dl class="detail-list">
+          <div><dt>Level</dt><dd>{{ course.level }}</dd></div>
+          <div><dt>Duration</dt><dd>{{ course.duration }}</dd></div>
+          <div><dt>Skills</dt><dd>{{ course.skills }}</dd></div>
+        </dl>
+        {% if current_user %}
+          <form method="post" action="{{ url_for('add_course', slug=course.slug) }}">
+            {{ csrf_field() }}
+            <button class="btn btn-blue" type="submit">Add to Vault</button>
+            <a class="btn btn-outline-dark" href="{{ url_for('courses') }}">Go Back</a>
+          </form>
+        {% else %}
+          <a class="btn btn-blue" href="{{ url_for('register') }}">Create Free Account</a>
+          <a class="btn btn-outline-dark" href="{{ url_for('courses') }}">Go Back</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}All Courses | EduVault{% endblock %}
+{% block public_content %}
+<section class="catalog-section">
+  <div class="container-fluid px-4">
+    <div class="catalog-head">
+      <div>
+        <p class="eyebrow">Course catalog</p>
+        <h1>All Educational Courses</h1>
+      </div>
+      <form class="catalog-search" action="{{ url_for('courses') }}" method="get">
+        <i class="bi bi-search"></i>
+        <input type="search" name="q" value="{{ q }}" placeholder="Search Courses...">
+      </form>
+    </div>
+    <div class="course-grid">
+      {% for course in courses %}
+        <article class="course-card">
+          <div class="course-logo">
+            <span>{{ course.badge }}</span>
+            <strong>{{ course.platform }}</strong>
+          </div>
+          <div class="course-card-body">
+            <h2>{{ course.title }}</h2>
+            <p>{{ course.description }}</p>
+            <p class="mb-1"><strong>Platform:</strong> {{ course.platform }}</p>
+            <p class="muted-small">{{ course.level }} &middot; {{ course.duration }}</p>
+            <a class="btn btn-blue w-100" href="{{ url_for('course_detail', slug=course.slug) }}">View Details</a>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-panel">No courses matched your search.</div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

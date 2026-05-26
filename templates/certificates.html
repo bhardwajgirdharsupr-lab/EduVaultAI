@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}My Certificates | EduVault{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">Verified proof</p>
+    <h1>My Verified Certificates</h1>
+  </div>
+  <button class="btn btn-blue" type="button" data-bs-toggle="collapse" data-bs-target="#uploadPanel">Upload New Certificate</button>
+</div>
+
+<div class="collapse mb-4" id="uploadPanel">
+  <div class="panel">
+    <h2>Upload Certificate</h2>
+    <form method="post" action="{{ url_for('upload_certificate') }}" enctype="multipart/form-data" class="upload-grid">
+      {{ csrf_field() }}
+      <input class="form-control" type="text" name="course_title" placeholder="Certificate or course title">
+      <input class="form-control" type="text" name="issuer" placeholder="Issuer or platform">
+      <input class="form-control" type="file" name="certificate" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" required>
+      <button class="btn btn-blue" type="submit">Upload & Verify</button>
+    </form>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="section-head">
+    <h2>Certificate Grid</h2>
+    <form class="inline-action compact-form" action="{{ url_for('certificates') }}" method="get">
+      <input type="search" name="q" value="{{ q }}" placeholder="Search by issuer, title, or hash">
+      <button class="btn btn-outline-dark" type="submit">Search</button>
+    </form>
+  </div>
+  <div class="certificate-grid">
+    {% for cert in certificates %}
+      <article class="certificate-card">
+        <div class="cert-preview"><i class="bi bi-file-earmark-check"></i></div>
+        <div class="cert-main">
+          <p class="cert-issuer">{{ cert.issuer }}</p>
+          <h3>{{ cert.course_title }}</h3>
+          <p class="muted-small">Issued {{ cert.uploaded_at[:10] }} &middot; {{ (cert.file_size / 1024)|round(1) }} KB</p>
+        </div>
+        <div class="verified-strip">
+          <i class="bi bi-check-circle-fill"></i> SHA-256 Verified
+          <span>{{ cert.sha256[:16] }}...</span>
+        </div>
+        <div class="card-actions">
+          <a class="btn btn-outline-dark btn-sm" href="{{ url_for('download_certificate', cert_id=cert.id) }}">Download</a>
+          <form method="post" action="{{ url_for('toggle_certificate_portfolio', cert_id=cert.id) }}">
+            {{ csrf_field() }}
+            <button class="btn btn-blue btn-sm" type="submit">{{ 'Remove from Portfolio' if cert.in_portfolio else 'Add to Portfolio' }}</button>
+          </form>
+        </div>
+      </article>
+    {% else %}
+      <div class="empty-panel">No certificates yet. Upload your first verified record.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="panel mt-4">
+  <h2>Certificate Details & Sharing</h2>
+  {% if selected %}
+    <div class="detail-split">
+      <div class="d-flex gap-3">
+        <div class="cert-preview small"><i class="bi bi-award"></i></div>
+        <div>
+          <h3>{{ selected.issuer }} - {{ selected.course_title }}</h3>
+          <p class="mb-1">Hash: {{ selected.sha256 }}</p>
+          <p class="muted-small">File: {{ selected.original_filename }}</p>
+        </div>
+      </div>
+      <ul>
+        <li>Verified certificate metadata</li>
+        <li>Verified issuer: {{ selected.issuer }}</li>
+        <li>Uploaded: {{ selected.uploaded_at[:10] }}</li>
+      </ul>
+      <form method="post" action="{{ url_for('share_certificate', cert_id=selected.id) }}">
+        {{ csrf_field() }}
+        <button class="btn btn-blue" type="submit">Generate Share Link</button>
+      </form>
+    </div>
+  {% else %}
+    <div class="empty-panel">Certificate details will appear after upload.</div>
+  {% endif %}
+</div>
+{% endblock %}

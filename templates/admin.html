@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Admin | EduVault{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">Platform operations</p>
+    <h1>Admin Dashboard</h1>
+  </div>
+  <a class="btn btn-outline-dark" href="{{ url_for('dashboard') }}">Back to Vault</a>
+</div>
+
+<div class="stats-grid mb-4">
+  <div class="stat-card"><i class="bi bi-people"></i><span>Total Users</span><strong>{{ stats.users }}</strong></div>
+  <div class="stat-card"><i class="bi bi-person-check"></i><span>Active Users</span><strong>{{ stats.active_users }}</strong></div>
+  <div class="stat-card"><i class="bi bi-journal"></i><span>Learning Items</span><strong>{{ stats.items }}</strong></div>
+  <div class="stat-card"><i class="bi bi-award"></i><span>Certificates</span><strong>{{ stats.certificates }}</strong></div>
+</div>
+
+<div class="admin-grid">
+  <section class="panel">
+    <h2>Users</h2>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {% for user in users %}
+            <tr>
+              <td>{{ user.full_name }}</td>
+              <td>{{ user.email }}</td>
+              <td><span class="badge text-bg-dark">{{ user.role }}</span></td>
+              <td><span class="badge text-bg-{{ 'success' if user.status == 'active' else 'secondary' }}">{{ user.status }}</span></td>
+              <td>
+                <form method="post" action="{{ url_for('admin_toggle_user', user_id=user.id) }}">
+                  {{ csrf_field() }}
+                  <button class="btn btn-outline-dark btn-sm" type="submit">{{ 'Deactivate' if user.status == 'active' else 'Reactivate' }}</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Recent Certificates</h2>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>Course</th><th>Owner</th><th>Hash</th></tr></thead>
+        <tbody>
+          {% for cert in certs %}
+            <tr><td>{{ cert.course_title }}</td><td>{{ cert.owner_email }}</td><td>{{ cert.sha256[:12] }}...</td></tr>
+          {% else %}
+            <tr><td colspan="3">No certificates yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Learning Items</h2>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>Title</th><th>Owner</th><th>Source</th><th></th></tr></thead>
+        <tbody>
+          {% for item in items %}
+            <tr>
+              <td>{{ item.title }}</td>
+              <td>{{ item.owner_email }}</td>
+              <td>{{ item.source }}</td>
+              <td>
+                <form method="post" action="{{ url_for('admin_delete_item', item_id=item.id) }}">
+                  {{ csrf_field() }}
+                  <button class="btn btn-outline-danger btn-sm" type="submit">Remove</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">No learning items yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Audit History</h2>
+    <div class="audit-list">
+      {% for audit in audits %}
+        <div><strong>{{ audit.action }}</strong><span>{{ audit.actor_email or 'system' }} &middot; {{ audit.created_at }}</span></div>
+      {% else %}
+        <div class="empty-panel">No audit events yet.</div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

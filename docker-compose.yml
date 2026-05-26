@@ -1,0 +1,53 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-dev-change-me}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@localhost}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      UDEMY_CLIENT_ID: ${UDEMY_CLIENT_ID:-}
+      UDEMY_CLIENT_SECRET: ${UDEMY_CLIENT_SECRET:-}
+      FEEDBACK_RECIPIENT: ${FEEDBACK_RECIPIENT:-eduvaultai.com@gmail.com}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-1}
+      DATABASE_PATH: ${DATABASE_PATH:-/app/data/eduvault.db}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+    volumes:
+      - eduvault_data:/app/data
+      - eduvault_uploads:/app/uploads
+    expose:
+      - "5000"
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  eduvault_data:
+  eduvault_uploads:
+  caddy_data:
+  caddy_config:

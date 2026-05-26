@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title }} | EduVault{% endblock %}
+{% block public_content %}
+<section class="static-hero">
+  <div class="container narrow">
+    <p class="eyebrow">{{ page.title }}</p>
+    <h1>{{ page.headline }}</h1>
+    {% for paragraph in page.body %}
+      <p class="lead">{{ paragraph }}</p>
+    {% endfor %}
+    {% if page.title == 'Pricing' %}
+      <div class="pricing-grid">
+        <div class="plan-card">
+          <h2>Free</h2>
+          <p>Course imports, certificate uploads, verification hashes, and share links.</p>
+          <strong>$0</strong>
+        </div>
+        <div class="plan-card pro">
+          <h2>Pro</h2>
+          <p>Team portfolios, advanced integrations, and richer exports. Coming soon.</p>
+          <strong>Coming Soon</strong>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
