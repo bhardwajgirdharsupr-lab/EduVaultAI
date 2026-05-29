@@ -1,44 +1,67 @@
 {% extends "base.html" %}
-{% block title %}Learning Resources | EduVault{% endblock %}
+{% block title %}My Learning Resources | EduVault{% endblock %}
 {% block content %}
-<div class="page-heading">
-  <div>
-    <p class="eyebrow">Learning hub</p>
-    <h1>My Learning Resources</h1>
+<div class="resources-hero">
+  <div class="page-heading mb-0">
+    <div>
+      <p class="eyebrow">My vault</p>
+      <h1>My Learning Resources</h1>
+      <p class="muted-small mb-0">Only the courses and links you have added to your vault are shown here.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-outline-dark" href="{{ url_for('export_resume') }}"><i class="bi bi-file-earmark-person"></i> Export Resume</a>
+      <a class="btn btn-outline-dark" href="{{ url_for('resource_collection') }}">Browse Resource Collection</a>
+      <a class="btn btn-blue" href="{{ url_for('certificates') }}">Upload New Certificate</a>
+    </div>
   </div>
-  <a class="btn btn-blue" href="{{ url_for('certificates') }}">Upload New Certificate</a>
 </div>
 
 <div class="panel">
   <div class="section-head">
-    <h2>Resource Collection</h2>
-    <form class="inline-action compact-form" method="post" action="{{ url_for('import_url') }}">
-      {{ csrf_field() }}
-      <input type="url" name="url" placeholder="Paste YouTube/Course URL to Aggregator">
-      <button class="btn btn-blue" type="submit">Bulk Import Resources</button>
+    <div>
+      <p class="eyebrow">Saved resources</p>
+      <h2>Courses in My Vault</h2>
+    </div>
+    <form class="catalog-search" action="{{ url_for('resources') }}" method="get">
+      <i class="bi bi-search"></i>
+      <input type="search" name="vault_q" value="{{ q }}" placeholder="Search your vault...">
     </form>
   </div>
-  <div class="resource-grid">
-    {% for course in suggestions %}
-      <article class="resource-card">
-        <div class="resource-icon">{{ course.badge }}</div>
-        <div class="resource-body">
-          <h3>{{ course.title }}</h3>
-          <p>{{ course.description }}</p>
-          <p class="muted-small">{{ course.platform }} &middot; {{ course.level }}</p>
-          <div class="resource-rating"><i class="bi bi-star-fill"></i> 4.8 <span>Skills: {{ course.skills }}</span></div>
+
+  <div class="timeline-list vault-resource-list">
+    {% for item in items %}
+      <article class="timeline-item">
+        <div class="timeline-icon"><i class="bi bi-journal-text"></i></div>
+        <div class="flex-grow-1">
+          <strong>{{ item.title }}</strong>
+          <p>{{ item.platform or item.source }} &middot; {{ item.status }}</p>
+          <div class="progress progress-slim"><div class="progress-bar" style="width: {{ item.progress }}%"></div></div>
         </div>
-        <form method="post" action="{{ url_for('add_course', slug=course.slug) }}">
-          {{ csrf_field() }}
-          <button class="btn btn-blue btn-sm" type="submit">Add to Vault</button>
-        </form>
+        <div class="vault-resource-actions">
+          {% if item.url %}
+            <a class="btn btn-blue btn-sm" href="{{ item.url }}" target="_blank">Open Learning Material</a>
+          {% endif %}
+          <form method="post" action="{{ url_for('update_progress', item_id=item.id) }}">
+            {{ csrf_field() }}
+            <input class="form-control form-control-sm" type="number" name="progress" min="0" max="100" value="{{ item.progress }}">
+            <button class="btn btn-outline-dark btn-sm" type="submit">Update</button>
+          </form>
+          <form method="post" action="{{ url_for('delete_item', item_id=item.id) }}" onsubmit="return confirm('Warning: this will remove this course or learning material from your vault. Continue?');">
+            {{ csrf_field() }}
+            <button class="btn btn-danger btn-sm" type="submit"><i class="bi bi-trash"></i> Remove from Vault</button>
+          </form>
+        </div>
       </article>
+    {% else %}
+      <div class="empty-panel">
+        Your vault is empty. Browse the Resource Collection or import a course URL to add learning resources.
+      </div>
     {% endfor %}
   </div>
 </div>
 
 <div class="panel mt-4">
-  <h2>Resource Details & Action</h2>
+  <h2>Selected Resource Details</h2>
   {% if selected %}
     <div class="resource-detail">
       <div class="video-tile"><i class="bi bi-play-circle"></i><span>{{ selected.source }}</span></div>
@@ -53,18 +76,18 @@
       </div>
       <div class="action-stack">
         {% if selected.url %}
-          <a class="btn btn-blue" href="{{ selected.url }}" target="_blank">Open Resource</a>
+          <a class="btn btn-blue" href="{{ selected.url }}" target="_blank">Open Learning Material</a>
         {% endif %}
-        <form method="post" action="{{ url_for('update_progress', item_id=selected.id) }}">
+        <form method="post" action="{{ url_for('delete_item', item_id=selected.id) }}" onsubmit="return confirm('Warning: this will remove this course or learning material from your vault. Continue?');">
           {{ csrf_field() }}
-          <input class="form-control" type="number" name="progress" min="0" max="100" value="{{ selected.progress }}">
-          <button class="btn btn-outline-dark" type="submit">Update Progress</button>
+          <button class="btn btn-danger" type="submit"><i class="bi bi-trash"></i> Remove from My Vault</button>
         </form>
+        <a class="btn btn-outline-dark" href="{{ url_for('resource_collection') }}">Browse More Courses</a>
         <button class="btn btn-outline-dark" type="button" disabled>Generate Note</button>
       </div>
     </div>
   {% else %}
-    <div class="empty-panel">Add a course or import a URL to view resource actions.</div>
+    <div class="empty-panel">Add a course to your vault to view resource details here.</div>
   {% endif %}
 </div>
 {% endblock %}

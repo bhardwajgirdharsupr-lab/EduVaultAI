@@ -23,8 +23,14 @@
           <a class="nav-link {% if request.endpoint == 'certificates' %}active{% endif %}" href="{{ url_for('certificates') }}">
             <i class="bi bi-award"></i><span>My Certificates</span>
           </a>
+          <a class="nav-link" href="{{ url_for('export_resume') }}">
+            <i class="bi bi-file-earmark-person"></i><span>Export Resume</span>
+          </a>
           <a class="nav-link {% if request.endpoint == 'resources' %}active{% endif %}" href="{{ url_for('resources') }}">
-            <i class="bi bi-journal-bookmark"></i><span>Learning Resources</span>
+            <i class="bi bi-journal-bookmark"></i><span>My Learning Resources</span>
+          </a>
+          <a class="nav-link {% if request.endpoint == 'resource_collection' %}active{% endif %}" href="{{ url_for('resource_collection') }}">
+            <i class="bi bi-collection"></i><span>Resource Collection</span>
           </a>
           <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}">
             <i class="bi bi-graph-up"></i><span>Analytics</span>

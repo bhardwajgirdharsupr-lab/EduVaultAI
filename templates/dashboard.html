@@ -6,10 +6,13 @@
     <p class="eyebrow">My vault</p>
     <h1>My Learning Vault Dashboard</h1>
   </div>
-  <form method="post" action="{{ url_for('share_portfolio') }}">
-    {{ csrf_field() }}
-    <button class="btn btn-blue" type="submit">Generate Portfolio Link</button>
-  </form>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-dark" href="{{ url_for('export_resume') }}"><i class="bi bi-file-earmark-person"></i> Export Resume</a>
+    <form method="post" action="{{ url_for('share_portfolio') }}">
+      {{ csrf_field() }}
+      <button class="btn btn-blue" type="submit">Generate Portfolio Link</button>
+    </form>
+  </div>
 </div>
 
 <div class="dashboard-grid">

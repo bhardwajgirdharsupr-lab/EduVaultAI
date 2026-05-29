@@ -289,6 +289,19 @@ a:hover {
   animation: rise-in 520ms var(--ease) both;
 }
 
+.resources-hero {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(217, 236, 255, 0.48));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 2rem;
+  padding: clamp(1.1rem, 2.2vw, 1.65rem);
+}
+
+.resource-collection-section {
+  padding-top: 0.35rem;
+}
+
 .page-heading,
 .catalog-head,
 .section-head {
@@ -943,6 +956,28 @@ a:hover {
   margin: 0;
 }
 
+.vault-resource-list {
+  gap: 0.9rem;
+}
+
+.vault-resource-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.vault-resource-actions form {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+}
+
+.vault-resource-actions input {
+  max-width: 88px;
+}
+
 .progress {
   background: #dbeafe;
   border: 1px solid rgba(47, 128, 237, 0.16);
@@ -1283,6 +1318,11 @@ a:hover {
 
   .resource-card {
     grid-template-columns: 1fr;
+  }
+
+  .vault-resource-actions {
+    justify-content: flex-start;
+    width: 100%;
   }
 
   .card-actions {

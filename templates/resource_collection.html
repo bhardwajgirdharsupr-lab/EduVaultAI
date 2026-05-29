@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Resource Collection | EduVault{% endblock %}
+{% block content %}
+<div class="resources-hero">
+  <div class="page-heading mb-0">
+    <div>
+      <p class="eyebrow">Catalog</p>
+      <h1>Resource Collection</h1>
+      <p class="muted-small mb-0">Browse shared courses from the catalog and resources uploaded by users, then add the ones you want into your learning vault.</p>
+    </div>
+    <a class="btn btn-outline-dark" href="{{ url_for('resources') }}">My Learning Resources</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Browse courses</p>
+      <h2>Course Catalog</h2>
+    </div>
+    <form class="catalog-search" action="{{ url_for('resource_collection') }}" method="get">
+      <i class="bi bi-search"></i>
+      <input type="search" name="q" value="{{ q }}" placeholder="Search collection...">
+    </form>
+  </div>
+
+  <form class="inline-action compact-form mb-4" method="post" action="{{ url_for('import_url') }}">
+    {{ csrf_field() }}
+    <input type="url" name="url" placeholder="Paste YouTube/Course URL to add to your vault and the shared collection">
+    <button class="btn btn-blue" type="submit">Import & Share</button>
+  </form>
+
+  <div class="resource-grid">
+    {% for course in suggestions %}
+      <article class="resource-card">
+        <div class="resource-icon">{{ course.badge }}</div>
+        <div class="resource-body">
+          <h3>{{ course.title }}</h3>
+          <p>{{ course.description }}</p>
+          <p class="muted-small">{{ course.platform }} &middot; {{ course.level }} &middot; {{ course.duration }}</p>
+          <div class="resource-rating">
+            <i class="bi bi-star-fill"></i>
+            {{ course.num_reviews }} reviews
+            <span>Subject: {{ course.skills or course.subject }}</span>
+          </div>
+        </div>
+        {% if course.id in vault_course_ids %}
+          {% if course.url %}
+            <a class="btn btn-blue btn-sm" href="{{ course.url }}" target="_blank">Open</a>
+          {% else %}
+            <a class="btn btn-blue btn-sm" href="{{ url_for('course_detail', slug=course.slug) }}">Open</a>
+          {% endif %}
+        {% else %}
+          <form method="post" action="{{ url_for('add_course', slug=course.slug) }}">
+            {{ csrf_field() }}
+            <button class="btn btn-blue btn-sm" type="submit">Add to Vault</button>
+          </form>
+        {% endif %}
+      </article>
+    {% else %}
+      <div class="empty-panel">No courses matched your search.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

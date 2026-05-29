@@ -18,13 +18,30 @@
           <div><dt>Skills</dt><dd>{{ course.skills }}</dd></div>
         </dl>
         {% if current_user %}
-          <form method="post" action="{{ url_for('add_course', slug=course.slug) }}">
-            {{ csrf_field() }}
-            <button class="btn btn-blue" type="submit">Add to Vault</button>
+          <div class="d-flex flex-wrap gap-2">
+            {% if vault_item %}
+              {% if vault_item.url %}
+                <a class="btn btn-blue" href="{{ vault_item.url }}" target="_blank">Open Learning Material</a>
+              {% elif course.url %}
+                <a class="btn btn-blue" href="{{ course.url }}" target="_blank">Open Learning Material</a>
+              {% endif %}
+              <a class="btn btn-outline-dark" href="{{ url_for('resources') }}">View in My Resources</a>
+            {% else %}
+              <form method="post" action="{{ url_for('add_course', slug=course.slug) }}">
+                {{ csrf_field() }}
+                <button class="btn btn-blue" type="submit">Add to Vault</button>
+              </form>
+              {% if course.url %}
+                <a class="btn btn-outline-dark" href="{{ course.url }}" target="_blank">Open Course Link</a>
+              {% endif %}
+            {% endif %}
             <a class="btn btn-outline-dark" href="{{ url_for('courses') }}">Go Back</a>
-          </form>
+          </div>
         {% else %}
           <a class="btn btn-blue" href="{{ url_for('register') }}">Create Free Account</a>
+          {% if course.url %}
+            <a class="btn btn-outline-dark" href="{{ course.url }}" target="_blank">Open Course Link</a>
+          {% endif %}
           <a class="btn btn-outline-dark" href="{{ url_for('courses') }}">Go Back</a>
         {% endif %}
       </div>

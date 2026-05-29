@@ -6,7 +6,10 @@
     <p class="eyebrow">Verified proof</p>
     <h1>My Verified Certificates</h1>
   </div>
-  <button class="btn btn-blue" type="button" data-bs-toggle="collapse" data-bs-target="#uploadPanel">Upload New Certificate</button>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-dark" href="{{ url_for('export_resume') }}"><i class="bi bi-file-earmark-person"></i> Export Resume</a>
+    <button class="btn btn-blue" type="button" data-bs-toggle="collapse" data-bs-target="#uploadPanel">Upload New Certificate</button>
+  </div>
 </div>
 
 <div class="collapse mb-4" id="uploadPanel">

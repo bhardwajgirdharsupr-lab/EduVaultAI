@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 import secrets
 import smtplib
 import sqlite3
@@ -312,6 +313,32 @@ def init_db():
             FOREIGN KEY (certificate_id) REFERENCES certificates(id) ON DELETE SET NULL
         );
 
+        CREATE TABLE IF NOT EXISTS courses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            slug TEXT NOT NULL UNIQUE,
+            external_course_id TEXT,
+            title TEXT NOT NULL,
+            platform TEXT NOT NULL DEFAULT 'Udemy',
+            source TEXT NOT NULL DEFAULT 'udemy',
+            url TEXT,
+            description TEXT,
+            skills TEXT,
+            duration TEXT,
+            level TEXT,
+            badge TEXT,
+            subject TEXT,
+            is_paid INTEGER NOT NULL DEFAULT 0,
+            price REAL,
+            num_subscribers INTEGER NOT NULL DEFAULT 0,
+            num_reviews INTEGER NOT NULL DEFAULT 0,
+            num_lectures INTEGER NOT NULL DEFAULT 0,
+            published_timestamp TEXT,
+            created_by_user_id INTEGER,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        );
+
         CREATE TABLE IF NOT EXISTS certificates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -354,8 +381,60 @@ def init_db():
         );
         """
     )
+    ensure_column(db, "courses", "created_by_user_id", "INTEGER")
+    migrate_learning_items_to_courses(db)
     db.commit()
     db.close()
+
+
+def ensure_column(db, table, column, definition):
+    columns = {row["name"] for row in db.execute(f"PRAGMA table_info({table})")}
+    if column not in columns:
+        db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def migrate_learning_items_to_courses(db):
+    now = utc_now()
+    for item in db.execute("SELECT * FROM learning_items").fetchall():
+        existing = None
+        if item["url"]:
+            existing = db.execute("SELECT 1 FROM courses WHERE url = ? LIMIT 1", (item["url"],)).fetchone()
+        if not existing:
+            existing = db.execute(
+                "SELECT 1 FROM courses WHERE lower(title) = lower(?) AND lower(platform) = lower(?) LIMIT 1",
+                (item["title"], item["platform"] or item["source"]),
+            ).fetchone()
+        if existing:
+            continue
+        base_slug = slugify(item["title"])
+        slug = base_slug
+        index = 2
+        while db.execute("SELECT 1 FROM courses WHERE slug = ?", (slug,)).fetchone():
+            slug = f"{base_slug}-{index}"
+            index += 1
+        db.execute(
+            """
+            INSERT INTO courses (
+                slug, title, platform, source, url, description, skills, duration, level,
+                badge, subject, is_paid, price, num_subscribers, num_reviews, num_lectures,
+                created_by_user_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Self-paced', 'All Levels', ?, ?, 0, NULL, 0, 0, 0, ?, ?, ?)
+            """,
+            (
+                slug,
+                item["title"],
+                item["platform"] or item["source"].title(),
+                item["source"],
+                item["url"],
+                item["description"],
+                item["skills"],
+                badge_for_text(item["platform"] or item["source"]),
+                item["platform"] or item["source"].title(),
+                item["user_id"],
+                now,
+                now,
+            ),
+        )
 
 
 def bootstrap_admin():
@@ -457,22 +536,13 @@ def create_app():
         url = session.pop("pending_import_url", None)
         if url:
             create_learning_item_from_url(g.user["id"], url)
-            flash("Imported your saved resource into the vault.", "success")
+            flash("Imported your resource into your vault and the shared course collection.", "success")
         return redirect(url_for("dashboard"))
 
     @app.route("/courses")
     def courses():
         q = request.args.get("q", "").strip().lower()
-        courses_list = COURSE_CATALOG
-        if q:
-            courses_list = [
-                course
-                for course in COURSE_CATALOG
-                if q in course["title"].lower()
-                or q in course["platform"].lower()
-                or q in course["description"].lower()
-                or q in course["skills"].lower()
-            ]
+        courses_list = query_courses(q)
         return render_template("courses.html", courses=courses_list, q=q)
 
     @app.route("/courses/<slug>")
@@ -480,7 +550,8 @@ def create_app():
         course = find_course(slug)
         if not course:
             abort(404)
-        return render_template("course_detail.html", course=course)
+        vault_item = user_learning_item_for_course(g.user["id"], course) if g.user else None
+        return render_template("course_detail.html", course=course, vault_item=vault_item)
 
     @app.route("/courses/<slug>/add", methods=["POST"])
     @login_required
@@ -491,29 +562,41 @@ def create_app():
             abort(404)
         now = utc_now()
         db = get_db()
-        db.execute(
+        course_url = course["url"]
+        existing = db.execute(
             """
-            INSERT INTO learning_items
-                (user_id, title, source, url, description, platform, progress, status, skills, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            SELECT id FROM learning_items
+            WHERE user_id = ? AND (url = ? OR title = ?)
+            LIMIT 1
             """,
-            (
-                g.user["id"],
-                course["title"],
-                course["source"],
-                url_for("course_detail", slug=slug, _external=True),
-                course["description"],
-                course["platform"],
-                0,
-                "in-progress",
-                course["skills"],
-                now,
-                now,
-            ),
-        )
-        db.commit()
-        log_action("course_added", "course", None, course["title"])
-        flash("Course added to your learning vault.", "success")
+            (g.user["id"], course_url, course["title"]),
+        ).fetchone()
+        if existing:
+            flash("This course is already in your learning vault.", "info")
+        else:
+            db.execute(
+                """
+                INSERT INTO learning_items
+                    (user_id, title, source, url, description, platform, progress, status, skills, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    g.user["id"],
+                    course["title"],
+                    course["source"],
+                    course_url,
+                    course["description"],
+                    course["platform"],
+                    0,
+                    "in-progress",
+                    course["skills"],
+                    now,
+                    now,
+                ),
+            )
+            db.commit()
+            log_action("course_added", "course", course["id"], course["title"])
+            flash("Course added to your learning vault.", "success")
         return redirect(url_for("resources"))
 
     @app.route("/feedback", methods=["GET", "POST"])
@@ -665,7 +748,7 @@ def create_app():
         if warning:
             flash(warning, "warning")
         else:
-            flash(f"Imported {title}.", "success")
+            flash(f"Imported {title} into your vault and the shared course collection.", "success")
         log_action("url_imported", "learning_item", item_id, url)
         return redirect(request.referrer or url_for("dashboard"))
 
@@ -679,8 +762,8 @@ def create_app():
         get_db().execute("DELETE FROM learning_items WHERE id = ?", (item_id,))
         get_db().commit()
         log_action("learning_item_deleted", "learning_item", item_id, item["title"])
-        flash("Learning item removed.", "info")
-        return redirect(request.referrer or url_for("dashboard"))
+        flash("Course or learning material removed from your vault.", "info")
+        return redirect(url_for("resources"))
 
     @app.route("/items/<int:item_id>/progress", methods=["POST"])
     @login_required
@@ -804,20 +887,22 @@ def create_app():
     @app.route("/resources")
     @login_required
     def resources():
-        q = request.args.get("q", "").strip().lower()
-        suggestions = COURSE_CATALOG
-        if q:
-            suggestions = [
-                course
-                for course in COURSE_CATALOG
-                if q in course["title"].lower()
-                or q in course["platform"].lower()
-                or q in course["description"].lower()
-                or q in course["skills"].lower()
-            ]
         items = query_learning_items(g.user["id"], request.args.get("vault_q", ""))
         selected = items[0] if items else None
-        return render_template("resources.html", suggestions=suggestions, items=items, selected=selected, q=q)
+        return render_template("resources.html", items=items, selected=selected, q=request.args.get("vault_q", ""))
+
+    @app.route("/resource-collection")
+    @login_required
+    def resource_collection():
+        q = request.args.get("q", "").strip().lower()
+        suggestions = query_courses(q, limit=120)
+        vault_course_ids = user_course_ids(g.user["id"])
+        return render_template(
+            "resource_collection.html",
+            suggestions=suggestions,
+            q=q,
+            vault_course_ids=vault_course_ids,
+        )
 
     @app.route("/analytics")
     @login_required
@@ -918,6 +1003,13 @@ def create_app():
         export_path = get_upload_dir() / f"eduvault_export_{g.user['id']}.json"
         export_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return send_file(export_path, as_attachment=True, download_name="eduvault_export.json")
+
+    @app.route("/resume/export")
+    @login_required
+    def export_resume():
+        resume_path = build_resume_document(g.user, query_learning_items(g.user["id"]), query_certificates(g.user["id"]))
+        download_name = f"{slugify(g.user['full_name']) or 'eduvault'}_resume.doc"
+        return send_file(resume_path, as_attachment=True, download_name=download_name)
 
     @app.route("/p/<token>")
     def public_portfolio(token):
@@ -1056,8 +1148,9 @@ def should_use_app_shell():
             "resources",
             "analytics",
             "settings",
-            "admin_dashboard",
-        }
+                "admin_dashboard",
+                "resource_collection",
+            }
     )
 
 
@@ -1150,7 +1243,136 @@ def upsert_google_user(info):
 
 
 def find_course(slug):
-    return next((course for course in COURSE_CATALOG if course["slug"] == slug), None)
+    return get_db().execute("SELECT * FROM courses WHERE slug = ?", (slug,)).fetchone()
+
+
+def user_learning_item_for_course(user_id, course):
+    course_url = course["url"] or ""
+    return get_db().execute(
+        """
+        SELECT * FROM learning_items
+        WHERE user_id = ?
+          AND ((? != '' AND url = ?) OR title = ?)
+        LIMIT 1
+        """,
+        (user_id, course_url, course_url, course["title"]),
+    ).fetchone()
+
+
+def user_course_ids(user_id):
+    rows = get_db().execute(
+        """
+        SELECT courses.id
+        FROM courses
+        JOIN learning_items
+          ON learning_items.user_id = ?
+         AND (
+              (courses.url IS NOT NULL AND courses.url != '' AND learning_items.url = courses.url)
+              OR lower(learning_items.title) = lower(courses.title)
+         )
+        """,
+        (user_id,),
+    ).fetchall()
+    return {row["id"] for row in rows}
+
+
+def query_courses(q="", limit=None):
+    q = (q or "").strip()
+    db = get_db()
+    params = []
+    where = ""
+    if q:
+        like = f"%{q}%"
+        where = """
+            WHERE title LIKE ?
+               OR platform LIKE ?
+               OR description LIKE ?
+               OR skills LIKE ?
+               OR subject LIKE ?
+               OR level LIKE ?
+        """
+        params.extend([like, like, like, like, like, like])
+    sql = f"""
+        SELECT * FROM courses
+        {where}
+        ORDER BY num_subscribers DESC, title COLLATE NOCASE
+    """
+    if limit:
+        sql += " LIMIT ?"
+        params.append(limit)
+    return db.execute(sql, params).fetchall()
+
+
+def slugify(value):
+    value = (value or "").lower()
+    value = re.sub(r"[^a-z0-9]+", "-", value).strip("-")
+    return value or uuid.uuid4().hex[:10]
+
+
+def unique_course_slug(db, title):
+    base = slugify(title)
+    slug = base
+    index = 2
+    while db.execute("SELECT 1 FROM courses WHERE slug = ?", (slug,)).fetchone():
+        slug = f"{base}-{index}"
+        index += 1
+    return slug
+
+
+def badge_for_text(value):
+    words = [word for word in re.split(r"[^A-Za-z0-9]+", value or "") if word]
+    if not words:
+        return "EV"
+    if len(words) == 1:
+        return words[0][:2].upper()
+    return "".join(word[0] for word in words[:3]).upper()
+
+
+def get_or_create_shared_course(metadata, user_id=None):
+    db = get_db()
+    existing = None
+    if metadata.url:
+        existing = db.execute("SELECT * FROM courses WHERE url = ? LIMIT 1", (metadata.url,)).fetchone()
+    if not existing:
+        existing = db.execute(
+            """
+            SELECT * FROM courses
+            WHERE lower(title) = lower(?) AND lower(platform) = lower(?)
+            LIMIT 1
+            """,
+            (metadata.title, metadata.platform),
+        ).fetchone()
+    if existing:
+        return existing
+
+    now = utc_now()
+    db.execute(
+        """
+        INSERT INTO courses (
+            slug, title, platform, source, url, description, skills, duration, level,
+            badge, subject, is_paid, price, num_subscribers, num_reviews, num_lectures,
+            created_by_user_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 0, 0, 0, ?, ?, ?)
+        """,
+        (
+            unique_course_slug(db, metadata.title),
+            metadata.title[:180],
+            metadata.platform or metadata.source.title(),
+            metadata.source,
+            metadata.url,
+            metadata.description,
+            metadata.skills,
+            "Self-paced",
+            "All Levels",
+            badge_for_text(metadata.platform or metadata.source),
+            metadata.platform or metadata.source.title(),
+            user_id,
+            now,
+            now,
+        ),
+    )
+    db.commit()
+    return db.execute("SELECT * FROM courses WHERE rowid = last_insert_rowid()").fetchone()
 
 
 def classify_source(url):
@@ -1194,8 +1416,19 @@ def fetch_page_title(url):
 
 def create_learning_item_from_url(user_id, url):
     metadata = import_url_metadata(url)
+    course = get_or_create_shared_course(metadata, user_id=user_id)
     now = utc_now()
     db = get_db()
+    existing = db.execute(
+        """
+        SELECT id FROM learning_items
+        WHERE user_id = ? AND (url = ? OR title = ?)
+        LIMIT 1
+        """,
+        (user_id, course["url"], course["title"]),
+    ).fetchone()
+    if existing:
+        return existing["id"], course["title"], "This resource is already in your vault. It is also available in the shared collection."
     cursor = db.execute(
         """
         INSERT INTO learning_items
@@ -1204,18 +1437,18 @@ def create_learning_item_from_url(user_id, url):
         """,
         (
             user_id,
-            metadata.title[:180],
-            metadata.source,
-            metadata.url,
-            metadata.description,
-            metadata.platform,
-            metadata.skills,
+            course["title"],
+            course["source"],
+            course["url"],
+            course["description"],
+            course["platform"],
+            course["skills"],
             now,
             now,
         ),
     )
     db.commit()
-    return cursor.lastrowid, metadata.title, metadata.warning
+    return cursor.lastrowid, course["title"], metadata.warning
 
 
 def allowed_file(filename):
@@ -1298,6 +1531,68 @@ def vault_data(user_id):
             "portfolio_items": len([cert for cert in certificates if cert["in_portfolio"]]),
         },
     }
+
+
+def build_resume_document(user, items, certificates):
+    completed_items = [item for item in items if item["status"] == "verified" or (item["progress"] or 0) >= 100]
+    active_items = [item for item in items if item not in completed_items]
+    skill_names = []
+    for item in items:
+        for skill in (item["skills"] or "").split(","):
+            skill = skill.strip()
+            if skill and skill.lower() not in {existing.lower() for existing in skill_names}:
+                skill_names.append(skill)
+
+    def esc(value):
+        return escape(value or "")
+
+    def list_items(rows, renderer, empty_text):
+        if not rows:
+            return f"<p class='muted'>{esc(empty_text)}</p>"
+        return "<ul>" + "".join(renderer(row) for row in rows) + "</ul>"
+
+    html = f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{esc(user['full_name'])} Resume</title>
+  <style>
+    body {{ color: #111827; font-family: Arial, sans-serif; line-height: 1.45; margin: 42px; }}
+    h1 {{ color: #0d47a1; font-size: 30px; margin: 0 0 4px; }}
+    h2 {{ border-bottom: 2px solid #2f80ed; color: #0b1736; font-size: 17px; margin: 24px 0 10px; padding-bottom: 4px; }}
+    h3 {{ font-size: 14px; margin: 0 0 3px; }}
+    p {{ margin: 0 0 8px; }}
+    ul {{ margin: 0; padding-left: 20px; }}
+    li {{ margin-bottom: 8px; }}
+    .contact, .muted {{ color: #64748b; }}
+    .meta {{ color: #475569; font-size: 12px; }}
+    .summary {{ background: #eef6ff; border-left: 4px solid #2f80ed; padding: 10px 12px; }}
+  </style>
+</head>
+<body>
+  <h1>{esc(user['full_name'])}</h1>
+  <p class="contact">{esc(user['email'])}{' | ' + esc(user['phone']) if user['phone'] else ''}{' | ' + esc(user['location']) if user['location'] else ''}</p>
+  <p class="contact">{esc(user['institution']) if user['institution'] else 'Learning portfolio generated by EduVault'}</p>
+
+  <h2>Professional Summary</h2>
+  <p class="summary">Verified learning profile with {len(items)} saved courses or learning resources and {len(certificates)} uploaded certificates. Progress average: {vault_data(user['id'])['stats']['average_progress']}%.</p>
+
+  <h2>Skills</h2>
+  <p>{esc(', '.join(skill_names[:24]) if skill_names else 'Coursework, certificate verification, self-directed learning')}</p>
+
+  <h2>Completed Courses</h2>
+  {list_items(completed_items, lambda item: f"<li><h3>{esc(item['title'])}</h3><div class='meta'>{esc(item['platform'] or item['source'])} | Progress: {item['progress']}%</div><p>{esc(item['description'])}</p></li>", "No completed courses yet.")}
+
+  <h2>Current Learning</h2>
+  {list_items(active_items[:12], lambda item: f"<li><h3>{esc(item['title'])}</h3><div class='meta'>{esc(item['platform'] or item['source'])} | Progress: {item['progress']}%</div><p>{esc(item['description'])}</p></li>", "No active courses yet.")}
+
+  <h2>Certificates</h2>
+  {list_items(certificates, lambda cert: f"<li><h3>{esc(cert['course_title'])}</h3><div class='meta'>{esc(cert['issuer'])} | Uploaded: {esc(cert['uploaded_at'][:10])} | SHA-256: {esc(cert['sha256'][:16])}...</div></li>", "No certificates uploaded yet.")}
+</body>
+</html>"""
+    resume_path = get_upload_dir() / f"eduvault_resume_{user['id']}.doc"
+    resume_path.write_text(str(html), encoding="utf-8")
+    return resume_path
 
 
 def get_or_create_share_link(user_id, kind, certificate_id=None):
