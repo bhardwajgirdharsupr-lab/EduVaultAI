@@ -44,6 +44,41 @@ docker compose up --build -d
 
 Caddy will request and renew HTTPS certificates automatically for `DOMAIN`.
 
+## Render Deployment
+
+EduVault reads production credentials from Render environment variables. Do not commit real secret values.
+
+Set these variables in the Render service dashboard:
+
+- `APP_BASE_URL`: your Render or custom HTTPS URL, for example `https://eduvault.onrender.com`
+- `FLASK_SECRET_KEY`: a long random secret
+- `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+- `FEEDBACK_RECIPIENT`
+- `SMTP_HOST=smtp.gmail.com`
+- `SMTP_PORT=587`
+- `SMTP_USERNAME`: your Gmail address
+- `SMTP_PASSWORD`: your Gmail app password
+- `SMTP_FROM`: your Gmail address
+- `SMTP_USE_TLS=1`
+- `DATABASE_PATH=/app/data/eduvault.db`
+- `UPLOAD_DIR=/app/uploads`
+- `MAX_UPLOAD_MB=10`
+
+For Google OAuth, add this production redirect URI in Google Cloud Console:
+
+```text
+https://your-render-domain/auth/google/callback
+```
+
+Also add this authorized JavaScript origin:
+
+```text
+https://your-render-domain
+```
+
+The Docker image binds to Render's `PORT` automatically. If you need certificate uploads or SQLite data to survive redeploys on Render, attach a persistent disk and point `DATABASE_PATH` and `UPLOAD_DIR` at directories on that disk.
+
 ## Important Routes
 
 - `/` public home

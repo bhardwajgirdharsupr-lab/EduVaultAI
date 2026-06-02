@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: eduvault
+    env: docker
+    plan: free
+    envVars:
+      - key: APP_BASE_URL
+        sync: false
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: FEEDBACK_RECIPIENT
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_USE_TLS
+        value: "1"
+      - key: DATABASE_PATH
+        value: /app/data/eduvault.db
+      - key: UPLOAD_DIR
+        value: /app/uploads
+      - key: MAX_UPLOAD_MB
+        value: "10"
