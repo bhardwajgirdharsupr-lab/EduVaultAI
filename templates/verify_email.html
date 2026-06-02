@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Verify Email | EduVault{% endblock %}
+{% block public_content %}
+<section class="auth-section">
+  <div class="auth-card">
+    <h1>Verify Your Email</h1>
+    <p class="auth-helper">Enter the 6-digit code sent to {{ email }}.</p>
+    <form method="post" class="stacked-form">
+      {{ csrf_field() }}
+      <input type="hidden" name="email" value="{{ email }}">
+      <label>Verification Code</label>
+      <div class="input-icon otp-input">
+        <i class="bi bi-shield-check"></i>
+        <input type="text" name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required>
+      </div>
+      <button class="btn btn-blue w-100" type="submit">Verify Email</button>
+    </form>
+    <form method="post" action="{{ url_for('resend_verification_code') }}" class="mt-3 text-center">
+      {{ csrf_field() }}
+      <input type="hidden" name="email" value="{{ email }}">
+      <button class="small-link link-button" type="submit">Send a new code</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

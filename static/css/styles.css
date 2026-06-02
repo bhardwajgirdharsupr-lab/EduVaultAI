@@ -509,6 +509,11 @@ a:hover {
   margin-bottom: 1.6rem;
 }
 
+.auth-helper {
+  color: var(--muted);
+  margin: -0.7rem 0 1.4rem;
+}
+
 .stacked-form {
   display: grid;
   gap: 0.8rem;
@@ -606,6 +611,21 @@ a:hover {
 .small-link {
   color: var(--ink);
   font-size: 0.9rem;
+}
+
+.link-button {
+  background: transparent;
+  border: 0;
+  font-weight: 800;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.otp-input input {
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.18rem;
+  text-align: center;
 }
 
 .register-grid {

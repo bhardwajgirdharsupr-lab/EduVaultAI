@@ -6,7 +6,7 @@ import secrets
 import smtplib
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from functools import wraps
 from html.parser import HTMLParser
@@ -291,6 +291,16 @@ def init_db():
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             last_login_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS pending_registrations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            payload TEXT NOT NULL,
+            otp_hash TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS learning_items (
@@ -645,9 +655,66 @@ def create_app():
             if len(password) < 8:
                 flash("Use at least 8 characters for your password.", "danger")
                 return render_template("register.html"), 400
+            if get_db().execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone():
+                flash("That email is already registered. Please sign in.", "warning")
+                return render_template("register.html"), 409
+
+            otp = f"{secrets.randbelow(1_000_000):06d}"
+            pending_data = {
+                "full_name": full_name,
+                "email": email,
+                "phone": request.form.get("phone", "").strip(),
+                "date_of_birth": request.form.get("date_of_birth", "").strip(),
+                "institution": request.form.get("institution", "").strip(),
+                "password_hash": generate_password_hash(password),
+            }
+            save_pending_registration(pending_data, otp)
+            sent, error = send_registration_otp(email, full_name, otp)
+            if not sent:
+                delete_pending_registration(email)
+                flash(error or "Verification email could not be sent right now.", "danger")
+                return render_template("register.html"), 503
+
+            session["pending_registration_email"] = email
+            flash("We sent a 6-digit verification code to your email.", "success")
+            return redirect(url_for("verify_email"))
+        return render_template("register.html")
+
+    @app.route("/verify-email", methods=["GET", "POST"])
+    def verify_email():
+        if g.user:
+            return redirect(url_for("dashboard"))
+
+        email = normalize_email(session.get("pending_registration_email") or request.form.get("email"))
+        if not email:
+            flash("Start registration first so we know where to send your code.", "warning")
+            return redirect(url_for("register"))
+
+        pending = pending_registration_for(email)
+        if not pending:
+            flash("No pending verification was found. Please register again.", "warning")
+            session.pop("pending_registration_email", None)
+            return redirect(url_for("register"))
+
+        if request.method == "POST":
+            require_csrf()
+            otp = re.sub(r"\D", "", request.form.get("otp", ""))
+            if is_expired(pending["expires_at"]):
+                flash("That verification code has expired. Request a new code.", "warning")
+                return render_template("verify_email.html", email=email), 400
+            if len(otp) != 6 or not check_password_hash(pending["otp_hash"], otp):
+                flash("Invalid verification code.", "danger")
+                return render_template("verify_email.html", email=email), 401
+            if get_db().execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone():
+                delete_pending_registration(email)
+                session.pop("pending_registration_email", None)
+                flash("That email is already registered. Please sign in.", "warning")
+                return redirect(url_for("login"))
+
+            data = json.loads(pending["payload"])
             now = utc_now()
+            db = get_db()
             try:
-                db = get_db()
                 cursor = db.execute(
                     """
                     INSERT INTO users
@@ -655,25 +722,53 @@ def create_app():
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        full_name,
-                        email,
-                        request.form.get("phone", "").strip(),
-                        request.form.get("date_of_birth", "").strip(),
-                        request.form.get("institution", "").strip(),
-                        generate_password_hash(password),
+                        data["full_name"],
+                        data["email"],
+                        data.get("phone", ""),
+                        data.get("date_of_birth", ""),
+                        data.get("institution", ""),
+                        data["password_hash"],
                         now,
                         now,
                     ),
                 )
+                db.execute("DELETE FROM pending_registrations WHERE email = ?", (email,))
                 db.commit()
-                user_id = cursor.lastrowid
-                login_user(user_id)
-                log_action("user_registered", "user", user_id, email, actor_id=user_id)
-                flash("Welcome to EduVault. Your account is ready.", "success")
-                return redirect(url_for("import_pending" if session.get("pending_import_url") else "dashboard"))
             except sqlite3.IntegrityError:
+                db.rollback()
                 flash("That email is already registered. Please sign in.", "warning")
-        return render_template("register.html")
+                return redirect(url_for("login"))
+
+            session.pop("pending_registration_email", None)
+            user_id = cursor.lastrowid
+            login_user(user_id)
+            log_action("user_registered", "user", user_id, email, actor_id=user_id)
+            flash("Email verified. Welcome to EduVault.", "success")
+            return redirect(url_for("dashboard"))
+
+        return render_template("verify_email.html", email=email)
+
+    @app.route("/resend-verification-code", methods=["POST"])
+    def resend_verification_code():
+        if g.user:
+            return redirect(url_for("dashboard"))
+        require_csrf()
+        email = normalize_email(session.get("pending_registration_email") or request.form.get("email"))
+        pending = pending_registration_for(email) if email else None
+        if not pending:
+            flash("No pending verification was found. Please register again.", "warning")
+            return redirect(url_for("register"))
+
+        data = json.loads(pending["payload"])
+        otp = f"{secrets.randbelow(1_000_000):06d}"
+        save_pending_registration(data, otp)
+        sent, error = send_registration_otp(email, data["full_name"], otp)
+        if not sent:
+            flash(error or "Verification email could not be sent right now.", "danger")
+            return redirect(url_for("verify_email"))
+        session["pending_registration_email"] = email
+        flash("A new verification code has been sent.", "success")
+        return redirect(url_for("verify_email"))
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -706,7 +801,7 @@ def create_app():
         if oauth is None:
             flash("Google OAuth is not configured yet. Add Google client credentials to enable it.", "warning")
             return redirect(url_for("login"))
-        redirect_uri = url_for("google_callback", _external=True)
+        redirect_uri = f"{app.config['APP_BASE_URL']}{url_for('google_callback')}"
         return oauth.google.authorize_redirect(redirect_uri)
 
     @app.route("/auth/google/callback")
@@ -1632,20 +1727,107 @@ def get_share_link(token, kind):
     ).fetchone()
 
 
+def otp_expires_at(minutes=10):
+    return (datetime.now(timezone.utc) + timedelta(minutes=minutes)).replace(microsecond=0).isoformat()
+
+
+def is_expired(iso_value):
+    try:
+        return datetime.fromisoformat(iso_value) < datetime.now(timezone.utc)
+    except ValueError:
+        return True
+
+
+def smtp_settings():
+    recipient = os.environ.get("FEEDBACK_RECIPIENT", "eduvaultai.com@gmail.com")
+    smtp_username = os.environ.get("SMTP_USERNAME", "").strip()
+    return {
+        "host": os.environ.get("SMTP_HOST", "").strip(),
+        "port": int(os.environ.get("SMTP_PORT", "587")),
+        "username": smtp_username,
+        "password": os.environ.get("SMTP_PASSWORD", ""),
+        "from": os.environ.get("SMTP_FROM", smtp_username or recipient).strip(),
+        "use_tls": os.environ.get("SMTP_USE_TLS", "1") != "0",
+    }
+
+
+def send_smtp_message(email_message):
+    settings = smtp_settings()
+    if not settings["host"] or not settings["username"] or not settings["password"]:
+        return False, "Email is not configured yet. Add SMTP settings in the environment."
+
+    try:
+        with smtplib.SMTP(settings["host"], settings["port"], timeout=12) as smtp:
+            if settings["use_tls"]:
+                smtp.starttls()
+            smtp.login(settings["username"], settings["password"])
+            smtp.send_message(email_message)
+    except Exception:
+        return False, "Email could not be sent. Check the SMTP credentials and try again."
+    return True, None
+
+
+def send_registration_otp(email, full_name, otp):
+    settings = smtp_settings()
+    email_message = EmailMessage()
+    email_message["Subject"] = "Your EduVault verification code"
+    email_message["From"] = settings["from"]
+    email_message["To"] = email
+    email_message.set_content(
+        "\n".join(
+            [
+                f"Hi {full_name},",
+                "",
+                f"Your EduVault verification code is: {otp}",
+                "",
+                "This code expires in 10 minutes.",
+                "If you did not request this account, you can ignore this email.",
+            ]
+        )
+    )
+    return send_smtp_message(email_message)
+
+
+def save_pending_registration(data, otp):
+    now = utc_now()
+    get_db().execute(
+        """
+        INSERT INTO pending_registrations (email, payload, otp_hash, expires_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(email) DO UPDATE SET
+            payload = excluded.payload,
+            otp_hash = excluded.otp_hash,
+            expires_at = excluded.expires_at,
+            updated_at = excluded.updated_at
+        """,
+        (
+            data["email"],
+            json.dumps(data),
+            generate_password_hash(otp),
+            otp_expires_at(),
+            now,
+            now,
+        ),
+    )
+    get_db().commit()
+
+
+def pending_registration_for(email):
+    return get_db().execute("SELECT * FROM pending_registrations WHERE email = ?", (email,)).fetchone()
+
+
+def delete_pending_registration(email):
+    get_db().execute("DELETE FROM pending_registrations WHERE email = ?", (email,))
+    get_db().commit()
+
+
 def send_feedback_email(name, email, category, message):
     recipient = os.environ.get("FEEDBACK_RECIPIENT", "eduvaultai.com@gmail.com")
-    smtp_host = os.environ.get("SMTP_HOST", "").strip()
-    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-    smtp_username = os.environ.get("SMTP_USERNAME", "").strip()
-    smtp_password = os.environ.get("SMTP_PASSWORD", "")
-    smtp_from = os.environ.get("SMTP_FROM", smtp_username or recipient).strip()
-    use_tls = os.environ.get("SMTP_USE_TLS", "1") != "0"
-    if not smtp_host or not smtp_username or not smtp_password:
-        return False, "Feedback email is not configured yet. Add SMTP settings in the environment."
+    settings = smtp_settings()
 
     email_message = EmailMessage()
     email_message["Subject"] = f"EduVault feedback: {category or 'General feedback'}"
-    email_message["From"] = smtp_from
+    email_message["From"] = settings["from"]
     email_message["To"] = recipient
     email_message["Reply-To"] = email
     email_message.set_content(
@@ -1663,15 +1845,8 @@ def send_feedback_email(name, email, category, message):
         )
     )
 
-    try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=12) as smtp:
-            if use_tls:
-                smtp.starttls()
-            smtp.login(smtp_username, smtp_password)
-            smtp.send_message(email_message)
-    except Exception:
-        return False, "Feedback email could not be sent. Check the SMTP credentials and try again."
-    return True, None
+    sent, error = send_smtp_message(email_message)
+    return sent, None if sent else error.replace("Email", "Feedback email", 1)
 
 
 app = create_app()
