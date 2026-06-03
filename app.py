@@ -1747,7 +1747,7 @@ def smtp_settings():
         "host": os.environ.get("SMTP_HOST", "").strip(),
         "port": int(os.environ.get("SMTP_PORT", "587")),
         "username": smtp_username,
-        "password": os.environ.get("SMTP_PASSWORD", "").strip().replace(" ", ""),
+        "password": os.environ.get("SMTP_PASSWORD", "").strip().strip('"').strip("'").replace(" ", ""),
         "from": os.environ.get("SMTP_FROM", smtp_username or recipient).strip(),
         "use_tls": os.environ.get("SMTP_USE_TLS", "1") != "0",
     }
