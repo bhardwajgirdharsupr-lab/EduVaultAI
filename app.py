@@ -19,6 +19,7 @@ from urllib.request import Request, urlopen
 from flask import (
     Flask,
     abort,
+    current_app,
     flash,
     g,
     jsonify,
@@ -31,6 +32,7 @@ from flask import (
 )
 from markupsafe import Markup, escape
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
 from connectors import import_url_metadata
@@ -495,9 +497,10 @@ def log_action(action, target_type=None, target_id=None, detail=None, actor_id=N
 
 def create_app():
     app = Flask(__name__)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "dev-change-me-eduvault")
     app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_MB", "10")) * 1024 * 1024
-    app.config["APP_BASE_URL"] = os.environ.get("APP_BASE_URL", "http://localhost:5055").rstrip("/")
+    app.config["APP_BASE_URL"] = os.environ.get("APP_BASE_URL", "").strip().rstrip("/")
     app.teardown_appcontext(close_db)
 
     init_db()
@@ -804,7 +807,8 @@ def create_app():
         if oauth is None:
             flash("Google OAuth is not configured yet. Add Google client credentials to enable it.", "warning")
             return redirect(url_for("login"))
-        redirect_uri = f"{app.config['APP_BASE_URL']}{url_for('google_callback')}"
+        redirect_uri = external_url_for("google_callback")
+        logger.info("Starting Google OAuth redirect_uri=%s", redirect_uri)
         return oauth.google.authorize_redirect(redirect_uri)
 
     @app.route("/auth/google/callback")
@@ -816,6 +820,7 @@ def create_app():
             token = oauth.google.authorize_access_token()
             info = token.get("userinfo") or oauth.google.parse_id_token(token)
         except Exception:
+            logger.exception("Google OAuth callback failed")
             flash("Google sign-in could not be completed. Try again.", "danger")
             return redirect(url_for("login"))
         email = normalize_email(info.get("email"))
@@ -1221,8 +1226,8 @@ def create_app():
 def configure_oauth(app):
     if OAuth is None:
         return None
-    client_id = os.environ.get("GOOGLE_CLIENT_ID")
-    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip().strip('"').strip("'")
     if not client_id or not client_secret:
         return None
     oauth = OAuth(app)
@@ -1234,6 +1239,13 @@ def configure_oauth(app):
         client_kwargs={"scope": "openid email profile"},
     )
     return oauth
+
+
+def external_url_for(endpoint, **values):
+    base_url = current_app.config.get("APP_BASE_URL")
+    if base_url:
+        return f"{base_url}{url_for(endpoint, **values)}"
+    return url_for(endpoint, _external=True, _scheme="https", **values)
 
 
 def should_use_app_shell():
