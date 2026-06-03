@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import os
 import re
 import secrets
@@ -43,6 +44,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DATABASE = BASE_DIR / "data" / "eduvault.db"
 DEFAULT_UPLOAD_DIR = BASE_DIR / "uploads"
 ALLOWED_UPLOADS = {"pdf", "png", "jpg", "jpeg", "doc", "docx"}
+logger = logging.getLogger(__name__)
 
 
 def load_env_file(path=BASE_DIR / ".env"):
@@ -1745,7 +1747,7 @@ def smtp_settings():
         "host": os.environ.get("SMTP_HOST", "").strip(),
         "port": int(os.environ.get("SMTP_PORT", "587")),
         "username": smtp_username,
-        "password": os.environ.get("SMTP_PASSWORD", ""),
+        "password": os.environ.get("SMTP_PASSWORD", "").strip().replace(" ", ""),
         "from": os.environ.get("SMTP_FROM", smtp_username or recipient).strip(),
         "use_tls": os.environ.get("SMTP_USE_TLS", "1") != "0",
     }
@@ -1763,6 +1765,14 @@ def send_smtp_message(email_message):
             smtp.login(settings["username"], settings["password"])
             smtp.send_message(email_message)
     except Exception:
+        logger.exception(
+            "SMTP send failed for host=%s port=%s username=%s from=%s to=%s",
+            settings["host"],
+            settings["port"],
+            settings["username"],
+            settings["from"],
+            email_message.get("To"),
+        )
         return False, "Email could not be sent. Check the SMTP credentials and try again."
     return True, None
 
