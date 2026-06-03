@@ -1764,14 +1764,16 @@ def send_smtp_message(email_message):
                 smtp.starttls()
             smtp.login(settings["username"], settings["password"])
             smtp.send_message(email_message)
-    except Exception:
+    except Exception as exc:
         logger.exception(
-            "SMTP send failed for host=%s port=%s username=%s from=%s to=%s",
+            "SMTP send failed for host=%s port=%s username=%s from=%s to=%s error=%s: %s",
             settings["host"],
             settings["port"],
             settings["username"],
             settings["from"],
             email_message.get("To"),
+            exc.__class__.__name__,
+            exc,
         )
         return False, "Email could not be sent. Check the SMTP credentials and try again."
     return True, None
