@@ -1819,7 +1819,9 @@ def send_resend_message(email_message):
 
 def send_email_message(email_message):
     if os.environ.get("RESEND_API_KEY", "").strip():
+        logger.info("Email provider selected: resend to=%s", email_message.get("To"))
         return send_resend_message(email_message)
+    logger.info("Email provider selected: smtp to=%s", email_message.get("To"))
     return send_smtp_message(email_message)
 
 
