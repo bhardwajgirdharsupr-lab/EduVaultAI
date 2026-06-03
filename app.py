@@ -12,6 +12,7 @@ from email.message import EmailMessage
 from functools import wraps
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -1753,6 +1754,75 @@ def smtp_settings():
     }
 
 
+def resend_settings():
+    api_key = os.environ.get("RESEND_API_KEY", "").strip().strip('"').strip("'")
+    email_from = (
+        os.environ.get("EMAIL_FROM", "")
+        or os.environ.get("SMTP_FROM", "")
+        or os.environ.get("SMTP_USERNAME", "")
+        or "onboarding@resend.dev"
+    )
+    return {
+        "api_key": api_key,
+        "from": email_from.strip(),
+    }
+
+
+def send_resend_message(email_message):
+    settings = resend_settings()
+    if not settings["api_key"]:
+        return False, "Resend email is not configured yet. Add RESEND_API_KEY in the environment."
+
+    payload = {
+        "from": settings["from"],
+        "to": [address.strip() for address in email_message.get("To", "").split(",") if address.strip()],
+        "subject": email_message.get("Subject", ""),
+        "text": email_message.get_content(),
+    }
+    request = Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {settings['api_key']}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=15) as response:
+            if response.status >= 400:
+                body = response.read().decode("utf-8", errors="replace")
+                raise RuntimeError(f"Resend returned HTTP {response.status}: {body}")
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        logger.exception(
+            "Resend send failed from=%s to=%s error=%s: %s body=%s",
+            settings["from"],
+            email_message.get("To"),
+            exc.__class__.__name__,
+            exc,
+            body,
+        )
+        return False, "Email could not be sent through Resend. Check the email API settings and try again."
+    except Exception as exc:
+        logger.exception(
+            "Resend send failed from=%s to=%s error=%s: %s",
+            settings["from"],
+            email_message.get("To"),
+            exc.__class__.__name__,
+            exc,
+        )
+        return False, "Email could not be sent through Resend. Check the email API settings and try again."
+    return True, None
+
+
+def send_email_message(email_message):
+    if os.environ.get("RESEND_API_KEY", "").strip():
+        return send_resend_message(email_message)
+    return send_smtp_message(email_message)
+
+
 def send_smtp_message(email_message):
     settings = smtp_settings()
     if not settings["host"] or not settings["username"] or not settings["password"]:
@@ -1780,7 +1850,7 @@ def send_smtp_message(email_message):
 
 
 def send_registration_otp(email, full_name, otp):
-    settings = smtp_settings()
+    settings = resend_settings() if os.environ.get("RESEND_API_KEY", "").strip() else smtp_settings()
     email_message = EmailMessage()
     email_message["Subject"] = "Your EduVault verification code"
     email_message["From"] = settings["from"]
@@ -1797,7 +1867,7 @@ def send_registration_otp(email, full_name, otp):
             ]
         )
     )
-    return send_smtp_message(email_message)
+    return send_email_message(email_message)
 
 
 def save_pending_registration(data, otp):
@@ -1857,7 +1927,7 @@ def send_feedback_email(name, email, category, message):
         )
     )
 
-    sent, error = send_smtp_message(email_message)
+    sent, error = send_email_message(email_message)
     return sent, None if sent else error.replace("Email", "Feedback email", 1)
 
 

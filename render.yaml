@@ -18,6 +18,10 @@ services:
         sync: false
       - key: FEEDBACK_RECIPIENT
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: onboarding@resend.dev
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
