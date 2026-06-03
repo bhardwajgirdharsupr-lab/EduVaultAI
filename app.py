@@ -1229,7 +1229,13 @@ def configure_oauth(app):
     client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip().strip('"').strip("'")
     if not client_id or not client_secret:
+        logger.warning(
+            "Google OAuth disabled: GOOGLE_CLIENT_ID set=%s GOOGLE_CLIENT_SECRET set=%s",
+            bool(client_id),
+            bool(client_secret),
+        )
         return None
+    logger.info("Google OAuth enabled")
     oauth = OAuth(app)
     oauth.register(
         name="google",
