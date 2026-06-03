@@ -21,7 +21,9 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
-        value: onboarding@resend.dev
+        sync: false
+      - key: RESEND_ALLOW_TEST_FROM
+        value: "0"
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

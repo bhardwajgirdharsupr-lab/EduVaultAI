@@ -30,7 +30,7 @@ Connector metadata is optional. EduVault can import Coursera, Udemy, and YouTube
 
 Feedback email uses SMTP. For Gmail, set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USERNAME`, and an app password in `SMTP_PASSWORD`. Feedback is sent to `FEEDBACK_RECIPIENT`, which defaults to `eduvaultai.com@gmail.com`.
 
-On platforms that block outbound SMTP, set `RESEND_API_KEY` and `EMAIL_FROM` to send OTP and feedback email through Resend over HTTPS.
+On platforms that block outbound SMTP, set `RESEND_API_KEY` and `EMAIL_FROM` to send OTP and feedback email through Resend over HTTPS. `EMAIL_FROM` must be a sender on a verified Resend domain.
 
 ## Docker VPS Deployment
 
@@ -58,12 +58,13 @@ Set these variables in the Render service dashboard:
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
 - `FEEDBACK_RECIPIENT`
 - `RESEND_API_KEY`: your Resend API key
-- `EMAIL_FROM`: your verified sender, or `onboarding@resend.dev` while testing
+- `EMAIL_FROM`: your verified sender, for example `hello@yourdomain.com`
+- `RESEND_ALLOW_TEST_FROM=0`
 - `DATABASE_PATH=/app/data/eduvault.db`
 - `UPLOAD_DIR=/app/uploads`
 - `MAX_UPLOAD_MB=10`
 
-Gmail SMTP can remain configured for local development, but Render free services may not reach SMTP ports `465` or `587`. When `RESEND_API_KEY` is set, EduVault uses Resend instead of SMTP for OTP and feedback email.
+Gmail SMTP can remain configured for local development, but Render free services may not reach SMTP ports `465` or `587`. When `RESEND_API_KEY` is set, EduVault uses Resend instead of SMTP for OTP and feedback email. Resend's `onboarding@resend.dev` sender is restricted to test sends; for user registrations, verify a domain in Resend and set `EMAIL_FROM` to that sender. If you intentionally want to use `onboarding@resend.dev` for a temporary test, set `RESEND_ALLOW_TEST_FROM=1`.
 
 For Google OAuth, add this production redirect URI in Google Cloud Console:
 

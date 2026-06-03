@@ -1760,18 +1760,35 @@ def resend_settings():
         os.environ.get("EMAIL_FROM", "")
         or os.environ.get("SMTP_FROM", "")
         or os.environ.get("SMTP_USERNAME", "")
-        or "onboarding@resend.dev"
     )
     return {
         "api_key": api_key,
         "from": email_from.strip(),
+        "allow_test_from": os.environ.get("RESEND_ALLOW_TEST_FROM", "0") == "1",
     }
+
+
+def resend_error_message(body=""):
+    text = (body or "").lower()
+    if "domain" in text and ("verify" in text or "not found" in text):
+        return "Email could not be sent through Resend. Set EMAIL_FROM to a sender on a verified Resend domain."
+    if "onboarding@resend.dev" in text or "testing emails" in text:
+        return "Email could not be sent through Resend. Replace onboarding@resend.dev with a verified EMAIL_FROM sender."
+    if "1010" in text or "user-agent" in text:
+        return "Email could not be sent through Resend. The Resend request was blocked before it reached the API; check the request User-Agent header."
+    if "api key" in text or "unauthorized" in text or "forbidden" in text:
+        return "Email could not be sent through Resend. Check RESEND_API_KEY and make sure it has email send access."
+    return "Email could not be sent through Resend. Check the email API settings and try again."
 
 
 def send_resend_message(email_message):
     settings = resend_settings()
     if not settings["api_key"]:
         return False, "Resend email is not configured yet. Add RESEND_API_KEY in the environment."
+    if not settings["from"]:
+        return False, "Resend email is not configured yet. Add EMAIL_FROM with a verified sender address."
+    if settings["from"].lower() == "onboarding@resend.dev" and not settings["allow_test_from"]:
+        return False, "Email could not be sent through Resend. Replace onboarding@resend.dev with a verified EMAIL_FROM sender."
 
     payload = {
         "from": settings["from"],
@@ -1785,6 +1802,7 @@ def send_resend_message(email_message):
         headers={
             "Authorization": f"Bearer {settings['api_key']}",
             "Content-Type": "application/json",
+            "User-Agent": "EduVault/1.0",
         },
         method="POST",
     )
@@ -1804,7 +1822,7 @@ def send_resend_message(email_message):
             exc,
             body,
         )
-        return False, "Email could not be sent through Resend. Check the email API settings and try again."
+        return False, resend_error_message(body)
     except Exception as exc:
         logger.exception(
             "Resend send failed from=%s to=%s error=%s: %s",
