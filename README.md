@@ -78,6 +78,8 @@ Also add this authorized JavaScript origin:
 https://your-render-domain
 ```
 
+If you use a custom domain, open `/auth/google/status` on that exact domain and copy the `callback_url` value into Google Cloud Console. Google OAuth must start and finish on the same host, otherwise the browser will not send the session cookie that stores the OAuth state.
+
 The Docker image binds to Render's `PORT` automatically. If you need certificate uploads or SQLite data to survive redeploys on Render, attach a persistent disk and point `DATABASE_PATH` and `UPLOAD_DIR` at directories on that disk.
 
 ## Important Routes

@@ -919,7 +919,7 @@ def create_app():
         if oauth is None:
             flash("Google OAuth is not configured yet. Add Google client credentials to enable it.", "warning")
             return redirect(url_for("login"))
-        redirect_uri = external_url_for("google_callback")
+        redirect_uri = request_external_url_for("google_callback")
         logger.info("Starting Google OAuth redirect_uri=%s host=%s scheme=%s", redirect_uri, request.host, request.scheme)
         return oauth.google.authorize_redirect(redirect_uri)
 
@@ -1350,9 +1350,10 @@ def create_app():
                 "client_id_set": bool(os.environ.get("GOOGLE_CLIENT_ID", "").strip().strip('"').strip("'")),
                 "client_secret_set": bool(os.environ.get("GOOGLE_CLIENT_SECRET", "").strip().strip('"').strip("'")),
                 "app_base_url": app.config["APP_BASE_URL"],
+                "app_base_callback_url": external_url_for("google_callback"),
                 "request_host": request.host,
                 "request_scheme": request.scheme,
-                "callback_url": external_url_for("google_callback"),
+                "callback_url": request_external_url_for("google_callback"),
             }
         )
 
@@ -1389,6 +1390,11 @@ def external_url_for(endpoint, **values):
     if base_url:
         return f"{base_url}{url_for(endpoint, **values)}"
     return url_for(endpoint, _external=True, _scheme="https", **values)
+
+
+def request_external_url_for(endpoint, **values):
+    scheme = "http" if request.host.startswith(("localhost", "127.0.0.1")) else "https"
+    return url_for(endpoint, _external=True, _scheme=scheme, **values)
 
 
 def normalized_app_base_url():
