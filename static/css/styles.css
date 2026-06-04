@@ -14,6 +14,7 @@
   --surface: rgba(255, 255, 255, 0.9);
   --shadow: 0 24px 70px rgba(15, 65, 120, 0.14);
   --shadow-soft: 0 14px 40px rgba(15, 65, 120, 0.1);
+  --shadow-lift: 0 30px 90px rgba(15, 65, 120, 0.18);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -25,6 +26,7 @@ body {
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
+  overflow-x: hidden;
   text-rendering: optimizeLegibility;
 }
 
@@ -40,6 +42,11 @@ a {
 
 a:hover {
   color: var(--blue-strong);
+}
+
+:focus-visible {
+  outline: 3px solid rgba(18, 181, 203, 0.34);
+  outline-offset: 3px;
 }
 
 .public-body,
@@ -91,7 +98,22 @@ a:hover {
   display: inline-flex;
   height: 42px;
   justify-content: center;
+  overflow: hidden;
+  position: relative;
   width: 42px;
+}
+
+.brand-mark::after {
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.52) 48%, transparent 100%);
+  content: "";
+  inset: -35% -70%;
+  position: absolute;
+  transform: translateX(-72%) rotate(12deg);
+  transition: transform 700ms var(--ease);
+}
+
+.brand:hover .brand-mark::after {
+  transform: translateX(72%) rotate(12deg);
 }
 
 .public-nav {
@@ -100,7 +122,14 @@ a:hover {
   box-shadow: 0 12px 32px rgba(15, 65, 120, 0.08);
   position: sticky;
   top: 0;
+  transition: background 220ms var(--ease), box-shadow 260ms var(--ease), border-color 220ms var(--ease);
   z-index: 20;
+}
+
+.public-nav.is-scrolled,
+.app-topbar.is-scrolled {
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 46px rgba(15, 65, 120, 0.12);
 }
 
 .navbar .nav-link {
@@ -118,6 +147,7 @@ a:hover {
 .btn {
   border-radius: 6px;
   font-weight: 700;
+  position: relative;
   transition: background 220ms var(--ease), border-color 220ms var(--ease), box-shadow 220ms var(--ease), color 220ms var(--ease), transform 220ms var(--ease);
 }
 
@@ -131,6 +161,22 @@ a:hover {
   border: 1px solid rgba(47, 128, 237, 0.2);
   box-shadow: 0 14px 30px rgba(47, 128, 237, 0.25);
   color: white;
+  overflow: hidden;
+}
+
+.btn-blue::after {
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.34) 48%, transparent 100%);
+  content: "";
+  inset: -55% -95%;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-68%) rotate(10deg);
+  transition: transform 650ms var(--ease);
+}
+
+.btn-blue:hover::after,
+.btn-blue:focus::after {
+  transform: translateX(68%) rotate(10deg);
 }
 
 .btn-blue:hover,
@@ -216,6 +262,7 @@ a:hover {
   padding: 0.85rem 1.5rem;
   position: sticky;
   top: 0;
+  transition: background 220ms var(--ease), box-shadow 260ms var(--ease);
   z-index: 15;
 }
 
@@ -374,6 +421,13 @@ a:hover {
   margin-bottom: 2.3rem;
 }
 
+.hero-copy .eyebrow,
+.auth-card h1,
+.page-heading h1,
+.catalog-head h1 {
+  text-wrap: balance;
+}
+
 .hero-search {
   background: rgba(255, 255, 255, 0.84);
   backdrop-filter: blur(16px);
@@ -383,6 +437,7 @@ a:hover {
   margin: 0 auto;
   max-width: 860px;
   padding: 0.45rem 0.55rem 0.45rem 0.9rem;
+  transition: border-color 220ms var(--ease), box-shadow 260ms var(--ease), transform 260ms var(--ease);
 }
 
 .hero-search input {
@@ -470,6 +525,18 @@ a:hover {
   align-items: center;
   display: flex;
   justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.auth-section::before {
+  background:
+    linear-gradient(115deg, transparent 0 18%, rgba(255, 255, 255, 0.46) 18% 21%, transparent 21% 100%),
+    linear-gradient(245deg, transparent 0 58%, rgba(18, 181, 203, 0.08) 58% 62%, transparent 62% 100%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
 }
 
 .auth-card,
@@ -481,6 +548,7 @@ a:hover {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
+  position: relative;
   transition: border-color 220ms var(--ease), box-shadow 220ms var(--ease), transform 220ms var(--ease);
 }
 
@@ -489,13 +557,23 @@ a:hover {
 .panel:hover,
 .plan-card:hover {
   border-color: rgba(47, 128, 237, 0.28);
-  box-shadow: 0 28px 80px rgba(15, 65, 120, 0.16);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-3px);
 }
 
 .auth-card {
   max-width: 500px;
+  overflow: hidden;
   padding: 2.35rem;
   width: min(92vw, 500px);
+}
+
+.auth-card::before {
+  background: linear-gradient(90deg, var(--blue-strong), var(--cyan), var(--green));
+  content: "";
+  height: 4px;
+  inset: 0 0 auto;
+  position: absolute;
 }
 
 .auth-card-wide {
@@ -533,6 +611,17 @@ a:hover {
   display: flex;
   gap: 0.7rem;
   padding: 0.55rem 0.8rem;
+  transition: background 180ms var(--ease), border-color 180ms var(--ease), box-shadow 220ms var(--ease), transform 220ms var(--ease);
+}
+
+.input-icon i {
+  color: var(--blue-strong);
+  transition: color 180ms var(--ease), transform 220ms var(--ease);
+}
+
+.input-icon:focus-within i {
+  color: var(--cyan);
+  transform: scale(1.08);
 }
 
 .input-icon input {
@@ -596,12 +685,26 @@ a:hover {
 
 .oauth-button {
   align-items: center;
-  background: transparent;
-  border: 0;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(47, 128, 237, 0.16);
+  border-radius: 8px;
+  box-shadow: 0 10px 26px rgba(15, 65, 120, 0.08);
   color: var(--ink);
   display: inline-flex;
   font-size: 1.65rem;
+  height: 48px;
   justify-content: center;
+  transition: background 180ms var(--ease), border-color 180ms var(--ease), box-shadow 220ms var(--ease), color 180ms var(--ease), transform 220ms var(--ease);
+  width: 54px;
+}
+
+.oauth-button:hover,
+.oauth-button:focus {
+  background: white;
+  border-color: rgba(47, 128, 237, 0.34);
+  box-shadow: var(--shadow-soft);
+  color: var(--blue-strong);
+  transform: translateY(-3px);
 }
 
 .oauth-button:disabled {
@@ -671,7 +774,25 @@ a:hover {
   border-radius: 8px;
   box-shadow: 0 14px 38px rgba(15, 65, 120, 0.08);
   overflow: hidden;
+  position: relative;
   transition: border-color 220ms var(--ease), box-shadow 220ms var(--ease), transform 220ms var(--ease);
+}
+
+.course-card::before,
+.certificate-card::before,
+.resource-card::before,
+.stat-card::before {
+  background: linear-gradient(90deg, rgba(47, 128, 237, 0.75), rgba(18, 181, 203, 0.65));
+  content: "";
+  height: 3px;
+  left: 0;
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  transform: scaleX(0.45);
+  transform-origin: left;
+  transition: opacity 220ms var(--ease), transform 260ms var(--ease);
 }
 
 .course-card:hover,
@@ -681,8 +802,16 @@ a:hover {
 .timeline-item:hover,
 .integration-grid div:hover {
   border-color: rgba(47, 128, 237, 0.32);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-lift);
   transform: translateY(-4px);
+}
+
+.course-card:hover::before,
+.certificate-card:hover::before,
+.resource-card:hover::before,
+.stat-card:hover::before {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .course-logo {
@@ -829,6 +958,7 @@ a:hover {
   gap: 0.35rem;
   min-height: 112px;
   padding: 1rem;
+  position: relative;
   transition: border-color 220ms var(--ease), box-shadow 220ms var(--ease), transform 220ms var(--ease);
 }
 
@@ -1309,11 +1439,59 @@ a:hover {
   }
 }
 
+.motion-ready .reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(18px) scale(0.985);
+  transition:
+    opacity 520ms var(--ease) var(--reveal-delay, 0ms),
+    transform 620ms var(--ease) var(--reveal-delay, 0ms),
+    border-color 220ms var(--ease),
+    box-shadow 220ms var(--ease);
+}
+
+.motion-ready .reveal-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.motion-ready .auth-card.reveal-on-scroll.is-visible:hover,
+.motion-ready .detail-card.reveal-on-scroll.is-visible:hover,
+.motion-ready .panel.reveal-on-scroll.is-visible:hover,
+.motion-ready .plan-card.reveal-on-scroll.is-visible:hover {
+  transform: translateY(-3px) scale(1);
+}
+
+.motion-ready .feature-pill.reveal-on-scroll.is-visible:hover,
+.motion-ready .course-card.reveal-on-scroll.is-visible:hover,
+.motion-ready .certificate-card.reveal-on-scroll.is-visible:hover,
+.motion-ready .resource-card.reveal-on-scroll.is-visible:hover,
+.motion-ready .stat-card.reveal-on-scroll.is-visible:hover,
+.motion-ready .timeline-item.reveal-on-scroll.is-visible:hover,
+.motion-ready .integration-grid > div.reveal-on-scroll.is-visible:hover {
+  transform: translateY(-4px) scale(1);
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.motion-ready .brand-mark {
+  animation: float-soft 4.8s var(--ease) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
   }
