@@ -39,8 +39,10 @@ from connectors import import_url_metadata
 
 try:
     from authlib.integrations.flask_client import OAuth
-except Exception:  # Authlib is installed in Docker/production via requirements.txt.
+    OAUTH_IMPORT_ERROR = ""
+except Exception as exc:  # Authlib is installed in Docker/production via requirements.txt.
     OAuth = None
+    OAUTH_IMPORT_ERROR = f"{exc.__class__.__name__}: {exc}"
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -918,7 +920,7 @@ def create_app():
             flash("Google OAuth is not configured yet. Add Google client credentials to enable it.", "warning")
             return redirect(url_for("login"))
         redirect_uri = external_url_for("google_callback")
-        logger.info("Starting Google OAuth redirect_uri=%s", redirect_uri)
+        logger.info("Starting Google OAuth redirect_uri=%s host=%s scheme=%s", redirect_uri, request.host, request.scheme)
         return oauth.google.authorize_redirect(redirect_uri)
 
     @app.route("/auth/google/callback")
@@ -926,12 +928,20 @@ def create_app():
         if oauth is None:
             flash("Google OAuth is not configured.", "warning")
             return redirect(url_for("login"))
+        if request.args.get("error"):
+            logger.warning(
+                "Google OAuth returned error=%s description=%s",
+                request.args.get("error"),
+                request.args.get("error_description"),
+            )
+            flash(request.args.get("error_description") or "Google sign-in was cancelled or rejected.", "danger")
+            return redirect(url_for("login"))
         try:
             token = oauth.google.authorize_access_token()
             info = token.get("userinfo") or oauth.google.parse_id_token(token)
-        except Exception:
-            logger.exception("Google OAuth callback failed")
-            flash("Google sign-in could not be completed. Try again.", "danger")
+        except Exception as exc:
+            logger.exception("Google OAuth callback failed: %s", exc)
+            flash(f"Google sign-in could not be completed: {exc.__class__.__name__}.", "danger")
             return redirect(url_for("login"))
         email = normalize_email(info.get("email"))
         if not email:
@@ -1330,13 +1340,30 @@ def create_app():
     def healthz():
         return jsonify({"ok": True, "time": utc_now()})
 
+    @app.route("/auth/google/status")
+    def google_oauth_status():
+        return jsonify(
+            {
+                "enabled": oauth is not None,
+                "authlib_installed": OAuth is not None,
+                "authlib_error": OAUTH_IMPORT_ERROR,
+                "client_id_set": bool(os.environ.get("GOOGLE_CLIENT_ID", "").strip().strip('"').strip("'")),
+                "client_secret_set": bool(os.environ.get("GOOGLE_CLIENT_SECRET", "").strip().strip('"').strip("'")),
+                "app_base_url": app.config["APP_BASE_URL"],
+                "request_host": request.host,
+                "request_scheme": request.scheme,
+                "callback_url": external_url_for("google_callback"),
+            }
+        )
+
     return app
 
 
 def configure_oauth(app):
     if OAuth is None:
+        logger.warning("Google OAuth disabled: Authlib import failed: %s", OAUTH_IMPORT_ERROR)
         return None
-    client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip().strip('"').strip("'")
     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip().strip('"').strip("'")
     if not client_id or not client_secret:
         logger.warning(
@@ -1358,10 +1385,22 @@ def configure_oauth(app):
 
 
 def external_url_for(endpoint, **values):
-    base_url = current_app.config.get("APP_BASE_URL")
+    base_url = normalized_app_base_url()
     if base_url:
         return f"{base_url}{url_for(endpoint, **values)}"
     return url_for(endpoint, _external=True, _scheme="https", **values)
+
+
+def normalized_app_base_url():
+    base_url = (current_app.config.get("APP_BASE_URL") or "").strip().rstrip("/")
+    if not base_url:
+        return ""
+    if not re.match(r"^https?://", base_url, re.I):
+        base_url = f"https://{base_url}"
+    parsed = urlparse(base_url)
+    if parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1"}:
+        base_url = base_url.replace("http://", "https://", 1)
+    return base_url
 
 
 def should_use_app_shell():
