@@ -308,6 +308,15 @@ def init_db():
             updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS pending_password_resets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            otp_hash TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS learning_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -775,6 +784,107 @@ def create_app():
         session["pending_registration_email"] = email
         flash("A new verification code has been sent.", "success")
         return redirect(url_for("verify_email"))
+
+    @app.route("/forgot-password", methods=["GET", "POST"])
+    def forgot_password():
+        if g.user:
+            return redirect(url_for("settings"))
+        if request.method == "POST":
+            require_csrf()
+            email = normalize_email(request.form.get("email"))
+            user = get_db().execute("SELECT * FROM users WHERE email = ? AND status = 'active'", (email,)).fetchone()
+            if not email or not user:
+                flash("Enter the email address for an active EduVault account.", "danger")
+                return render_template("forgot_password.html", email=email), 400
+
+            otp = f"{secrets.randbelow(1_000_000):06d}"
+            save_pending_password_reset(email, otp)
+            sent, error = send_password_reset_otp(email, user["full_name"], otp)
+            if not sent:
+                delete_pending_password_reset(email)
+                flash(error or "Password reset email could not be sent right now.", "danger")
+                return render_template("forgot_password.html", email=email), 503
+
+            session["pending_password_reset_email"] = email
+            flash("We sent a 6-digit password reset code to your email.", "success")
+            return redirect(url_for("reset_password"))
+        return render_template("forgot_password.html", email="")
+
+    @app.route("/reset-password", methods=["GET", "POST"])
+    def reset_password():
+        if g.user:
+            return redirect(url_for("settings"))
+
+        email = normalize_email(session.get("pending_password_reset_email") or request.form.get("email"))
+        if not email:
+            flash("Start with your email so we can send a reset code.", "warning")
+            return redirect(url_for("forgot_password"))
+
+        pending = pending_password_reset_for(email)
+        if not pending:
+            flash("No pending password reset was found. Request a new code.", "warning")
+            session.pop("pending_password_reset_email", None)
+            return redirect(url_for("forgot_password"))
+
+        if request.method == "POST":
+            require_csrf()
+            otp = re.sub(r"\D", "", request.form.get("otp", ""))
+            password = request.form.get("password", "")
+            confirm = request.form.get("confirm_password", "")
+            if is_expired(pending["expires_at"]):
+                flash("That reset code has expired. Request a new code.", "warning")
+                return render_template("reset_password.html", email=email), 400
+            if len(otp) != 6 or not check_password_hash(pending["otp_hash"], otp):
+                flash("Invalid reset code.", "danger")
+                return render_template("reset_password.html", email=email), 401
+            if len(password) < 8:
+                flash("Use at least 8 characters for your new password.", "danger")
+                return render_template("reset_password.html", email=email), 400
+            if password != confirm:
+                flash("Passwords do not match.", "danger")
+                return render_template("reset_password.html", email=email), 400
+
+            db = get_db()
+            cursor = db.execute(
+                "UPDATE users SET password_hash = ?, updated_at = ? WHERE email = ? AND status = 'active'",
+                (generate_password_hash(password), utc_now(), email),
+            )
+            if cursor.rowcount == 0:
+                db.rollback()
+                delete_pending_password_reset(email)
+                session.pop("pending_password_reset_email", None)
+                flash("That account is no longer active. Contact support if this looks wrong.", "danger")
+                return redirect(url_for("login"))
+            db.execute("DELETE FROM pending_password_resets WHERE email = ?", (email,))
+            db.commit()
+            session.pop("pending_password_reset_email", None)
+            log_action("password_reset_completed", "user", None, email)
+            flash("Password changed. Please sign in with your new password.", "success")
+            return redirect(url_for("login"))
+
+        return render_template("reset_password.html", email=email)
+
+    @app.route("/resend-password-reset-code", methods=["POST"])
+    def resend_password_reset_code():
+        if g.user:
+            return redirect(url_for("settings"))
+        require_csrf()
+        email = normalize_email(session.get("pending_password_reset_email") or request.form.get("email"))
+        pending = pending_password_reset_for(email) if email else None
+        user = get_db().execute("SELECT * FROM users WHERE email = ? AND status = 'active'", (email,)).fetchone() if email else None
+        if not pending or not user:
+            flash("No pending password reset was found. Request a new code.", "warning")
+            return redirect(url_for("forgot_password"))
+
+        otp = f"{secrets.randbelow(1_000_000):06d}"
+        save_pending_password_reset(email, otp)
+        sent, error = send_password_reset_otp(email, user["full_name"], otp)
+        if not sent:
+            flash(error or "Password reset email could not be sent right now.", "danger")
+            return redirect(url_for("reset_password"))
+        session["pending_password_reset_email"] = email
+        flash("We sent a new password reset code.", "success")
+        return redirect(url_for("reset_password"))
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -1908,6 +2018,27 @@ def send_registration_otp(email, full_name, otp):
     return send_email_message(email_message)
 
 
+def send_password_reset_otp(email, full_name, otp):
+    settings = resend_settings() if os.environ.get("RESEND_API_KEY", "").strip() else smtp_settings()
+    email_message = EmailMessage()
+    email_message["Subject"] = "Reset your EduVault password"
+    email_message["From"] = settings["from"]
+    email_message["To"] = email
+    email_message.set_content(
+        "\n".join(
+            [
+                f"Hi {full_name},",
+                "",
+                f"Your EduVault password reset code is: {otp}",
+                "",
+                "This code expires in 10 minutes.",
+                "If you did not request a password reset, you can ignore this email.",
+            ]
+        )
+    )
+    return send_email_message(email_message)
+
+
 def save_pending_registration(data, otp):
     now = utc_now()
     get_db().execute(
@@ -1938,6 +2069,37 @@ def pending_registration_for(email):
 
 def delete_pending_registration(email):
     get_db().execute("DELETE FROM pending_registrations WHERE email = ?", (email,))
+    get_db().commit()
+
+
+def save_pending_password_reset(email, otp):
+    now = utc_now()
+    get_db().execute(
+        """
+        INSERT INTO pending_password_resets (email, otp_hash, expires_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(email) DO UPDATE SET
+            otp_hash = excluded.otp_hash,
+            expires_at = excluded.expires_at,
+            updated_at = excluded.updated_at
+        """,
+        (
+            email,
+            generate_password_hash(otp),
+            otp_expires_at(),
+            now,
+            now,
+        ),
+    )
+    get_db().commit()
+
+
+def pending_password_reset_for(email):
+    return get_db().execute("SELECT * FROM pending_password_resets WHERE email = ?", (email,)).fetchone()
+
+
+def delete_pending_password_reset(email):
+    get_db().execute("DELETE FROM pending_password_resets WHERE email = ?", (email,))
     get_db().commit()
 
 
